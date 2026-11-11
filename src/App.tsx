@@ -608,7 +608,7 @@ export default function App() {
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-obsidian-950 border border-champagne-500/40 flex items-center justify-center animate-glow">
                 <ResilientImage
-                  src="/logo.png"
+                  src="./logo.png"
                   fallbackSrc={BRAND_LOGO_FALLBACK}
                   alt="Launcit Logo"
                   fallbackLabel="L"
@@ -861,7 +861,7 @@ export default function App() {
 
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden shrink-0 bg-obsidian-950 border border-champagne-500/40 md:hidden flex items-center justify-center">
               <ResilientImage
-                src="/logo.png"
+                src="./logo.png"
                 fallbackSrc={BRAND_LOGO_FALLBACK}
                 alt="Launcit Logo"
                 className="w-full h-full object-cover"

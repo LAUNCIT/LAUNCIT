@@ -19,7 +19,7 @@ import {
   WorkingDayConfig,
 } from '../types';
 
-export const BRAND_LOGO_FALLBACK = '/logo.png';
+export const BRAND_LOGO_FALLBACK = './logo.png';
 export const SPECIALIST_AVATAR_FALLBACK = specialistAsset;
 
 export const CATEGORY_LABELS: Record<ServiceCategory, string> = {

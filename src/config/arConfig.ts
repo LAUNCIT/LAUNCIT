@@ -1,6 +1,6 @@
 // Configuration for Global Launcit 3D Model & WebAR
 
-export const DEFAULT_GLOBAL_GLB = '/logo_launcit.glb';
+export const DEFAULT_GLOBAL_GLB = './logo_launcit.glb';
 export const FALLBACK_DEMO_GLB = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
 export const STORAGE_KEY_GLOBAL_GLB = 'launcit_global_glb_url';
 

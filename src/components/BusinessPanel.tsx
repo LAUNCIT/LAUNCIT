@@ -3683,7 +3683,8 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              const url = `${window.location.origin}/ver.html?negocio=${encodeURIComponent(v.name)}`;
+                              const pathname = window.location.pathname.replace(/\/index\.html$/i, '').replace(/\/$/, '');
+                              const url = `${window.location.origin}${pathname}/ver.html?negocio=${encodeURIComponent(v.name)}`;
                               if (navigator.clipboard) {
                                 navigator.clipboard.writeText(url);
                                 onShowToast(`Enlace WebAR copiado para ${v.name}`);
@@ -3708,7 +3709,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                             Ver QR
                           </button>
                           <a
-                            href={`${window.location.origin}/ver.html?negocio=${encodeURIComponent(v.name)}`}
+                            href={`./ver.html?negocio=${encodeURIComponent(v.name)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-2 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-bold text-[10px] uppercase transition-colors inline-flex items-center gap-1"
