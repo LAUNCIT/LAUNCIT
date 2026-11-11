@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
@@ -27,7 +27,17 @@ import {
   Users,
   X,
   QrCode,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
+import {
+  OFFLINE_STORAGE_KEYS,
+  loadFromStorage,
+  saveToStorage,
+  getOfflineQueue,
+  enqueueOfflineAction,
+  flushOfflineQueue,
+} from './utils/offlineSync';
 import {
   Appointment,
   AppRole,
@@ -94,25 +104,46 @@ export default function App() {
   );
   const [isBusinessAuthOpen, setIsBusinessAuthOpen] = useState(false);
 
-  // Shared Synchronized Platform State
-  const [venues, setVenues] = useState<Venue[]>(INITIAL_VENUES);
-  const [services, setServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
-  const [professionals, setProfessionals] = useState<Professional[]>(
-    INITIAL_PROFESSIONALS
+  // Shared Synchronized Platform State (Hydrated from localStorage for offline continuity)
+  const [venues, setVenues] = useState<Venue[]>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.VENUES, INITIAL_VENUES)
   );
-  const [workingDays, setWorkingDays] =
-    useState<Record<DayName, WorkingDayConfig>>(INITIAL_WORKING_DAYS);
-  const [blockedSlots, setBlockedSlots] =
-    useState<BlockedSlot[]>(INITIAL_BLOCKED_SLOTS);
-  const [appointments, setAppointments] =
-    useState<Appointment[]>(INITIAL_APPOINTMENTS);
+  const [services, setServices] = useState<ServiceItem[]>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.SERVICES, INITIAL_SERVICES)
+  );
+  const [professionals, setProfessionals] = useState<Professional[]>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.PROFESSIONALS, INITIAL_PROFESSIONALS)
+  );
+  const [workingDays, setWorkingDays] = useState<Record<DayName, WorkingDayConfig>>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.WORKING_DAYS, INITIAL_WORKING_DAYS)
+  );
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.BLOCKED_SLOTS, INITIAL_BLOCKED_SLOTS)
+  );
+  const [appointments, setAppointments] = useState<Appointment[]>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.APPOINTMENTS, INITIAL_APPOINTMENTS)
+  );
   const [activePlan, setActivePlan] = useState<SaasPlanId>('pro');
-  const [whatsAppConfig, setWhatsAppConfig] =
-    useState<WhatsAppConfig>(DEFAULT_WHATSAPP_CONFIG);
-  const [smsConfig, setSmsConfig] = useState<SmsConfig>(DEFAULT_SMS_CONFIG);
-  const [reviews, setReviews] = useState<Review[]>(INITIAL_REVIEWS);
+  const [whatsAppConfig, setWhatsAppConfig] = useState<WhatsAppConfig>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.WHATSAPP_CONFIG, DEFAULT_WHATSAPP_CONFIG)
+  );
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.SMS_CONFIG, DEFAULT_SMS_CONFIG)
+  );
+  const [reviews, setReviews] = useState<Review[]>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.REVIEWS, INITIAL_REVIEWS)
+  );
 
   const [authToken, setAuthToken] = useState<string | null>(null);
+
+  // Online / Offline & Sync Queue State
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(() => {
+    return getOfflineQueue().length;
+  });
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Client Lookup Phone
   const [lookupPhone, setLookupPhone] = useState('+57 312 456 7890');
@@ -123,6 +154,146 @@ export default function App() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
   };
+
+  // Synchronize state changes to localStorage immediately for offline resilience
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.VENUES, venues);
+  }, [venues]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.SERVICES, services);
+  }, [services]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.PROFESSIONALS, professionals);
+  }, [professionals]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.WORKING_DAYS, workingDays);
+  }, [workingDays]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.BLOCKED_SLOTS, blockedSlots);
+  }, [blockedSlots]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.APPOINTMENTS, appointments);
+  }, [appointments]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.WHATSAPP_CONFIG, whatsAppConfig);
+  }, [whatsAppConfig]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.SMS_CONFIG, smsConfig);
+  }, [smsConfig]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.REVIEWS, reviews);
+  }, [reviews]);
+
+  // Automated Queue Synchronization with Backend
+  const triggerSync = useCallback(async (manual = false) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (manual) {
+        showToast('Aún no hay conexión a internet. Los cambios se mantienen guardados localmente.');
+      }
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const { syncedCount, remainingCount } = await flushOfflineQueue(authToken);
+      setPendingSyncCount(remainingCount);
+
+      if (syncedCount > 0) {
+        showToast(`✨ Conexión recuperada: ${syncedCount} cambio(s) sincronizado(s) con el servidor.`);
+      } else if (manual) {
+        showToast('Todos los datos están sincronizados con el servidor.');
+      }
+    } catch (err) {
+      console.warn('Sync queue flush error:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [authToken]);
+
+  // Network connection monitor & periodic flush
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('🟢 Conexión reestablecida. Sincronizando datos...');
+      triggerSync();
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('⚠️ Modo sin conexión: los cambios se guardan localmente.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Heartbeat check every 25 seconds if unsynced changes exist
+    const interval = setInterval(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
+        triggerSync();
+      }
+    }, 25000);
+
+    // Check on initial load
+    if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
+      triggerSync();
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, [triggerSync]);
+
+  // Helper to dispatch mutation to server or queue for offline sync
+  const dispatchSyncAction = useCallback(
+    async (
+      endpoint: string,
+      method: 'POST' | 'DELETE',
+      body?: any,
+      description?: string
+    ) => {
+      const isOnlineNow = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+      if (!isOnlineNow) {
+        const updated = enqueueOfflineAction(endpoint, method, body, description);
+        setPendingSyncCount(updated.length);
+        return;
+      }
+
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const res = await fetch(endpoint, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+
+        if (!res.ok && res.status >= 500) {
+          const updated = enqueueOfflineAction(endpoint, method, body, description);
+          setPendingSyncCount(updated.length);
+        }
+      } catch {
+        const updated = enqueueOfflineAction(endpoint, method, body, description);
+        setPendingSyncCount(updated.length);
+      }
+    },
+    [authToken]
+  );
 
   const handleAddReview = (newRev: Omit<Review, 'id' | 'date'>) => {
     const reviewObj: Review = {
@@ -162,6 +333,9 @@ export default function App() {
   // Synchronize initial data from Cloud SQL PostgreSQL backend
   useEffect(() => {
     const loadCloudSqlData = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return; // Work fully from localStorage while offline
+      }
       try {
         const [resServices, resPros, resAppts, resBlocks, resWa, resVenues] = await Promise.allSettled([
           fetch('/api/services').then((r) => (r.ok ? r.json() : null)),
@@ -172,23 +346,28 @@ export default function App() {
           fetch('/api/venues').then((r) => (r.ok ? r.json() : null)),
         ]);
 
-        if (resServices.status === 'fulfilled' && Array.isArray(resServices.value) && resServices.value.length > 0) {
-          setServices(resServices.value);
-        }
-        if (resPros.status === 'fulfilled' && Array.isArray(resPros.value) && resPros.value.length > 0) {
-          setProfessionals(resPros.value);
-        }
-        if (resAppts.status === 'fulfilled' && Array.isArray(resAppts.value) && resAppts.value.length > 0) {
-          setAppointments(resAppts.value);
-        }
-        if (resBlocks.status === 'fulfilled' && Array.isArray(resBlocks.value) && resBlocks.value.length > 0) {
-          setBlockedSlots(resBlocks.value);
-        }
-        if (resWa.status === 'fulfilled' && resWa.value && resWa.value.businessPhone) {
-          setWhatsAppConfig(resWa.value);
-        }
-        if (resVenues.status === 'fulfilled' && Array.isArray(resVenues.value) && resVenues.value.length > 0) {
-          setVenues(resVenues.value);
+        const hasPendingLocalMutations = getOfflineQueue().length > 0;
+
+        // Preserve unsynced offline changes without overwriting from server
+        if (!hasPendingLocalMutations) {
+          if (resServices.status === 'fulfilled' && Array.isArray(resServices.value) && resServices.value.length > 0) {
+            setServices(resServices.value);
+          }
+          if (resPros.status === 'fulfilled' && Array.isArray(resPros.value) && resPros.value.length > 0) {
+            setProfessionals(resPros.value);
+          }
+          if (resAppts.status === 'fulfilled' && Array.isArray(resAppts.value) && resAppts.value.length > 0) {
+            setAppointments(resAppts.value);
+          }
+          if (resBlocks.status === 'fulfilled' && Array.isArray(resBlocks.value) && resBlocks.value.length > 0) {
+            setBlockedSlots(resBlocks.value);
+          }
+          if (resWa.status === 'fulfilled' && resWa.value && resWa.value.businessPhone) {
+            setWhatsAppConfig(resWa.value);
+          }
+          if (resVenues.status === 'fulfilled' && Array.isArray(resVenues.value) && resVenues.value.length > 0) {
+            setVenues(resVenues.value);
+          }
         }
       } catch (err) {
         console.warn('Notice loading data from backend:', err);
@@ -296,12 +475,13 @@ export default function App() {
       `Cita ${newAppt.code} confirmada para ${newAppt.client}. Comprobante listo para WhatsApp.`
     );
 
-    // Persist to Cloud SQL
-    fetch('/api/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newAppt),
-    }).catch((err) => console.warn('Appointment persist notice:', err));
+    // Persist to Cloud SQL / Offline Queue
+    dispatchSyncAction(
+      '/api/appointments',
+      'POST',
+      newAppt,
+      `Cita ${newAppt.code} (${newAppt.client})`
+    );
   };
 
   const handleCancelAppointment = (id: string) => {
@@ -311,7 +491,7 @@ export default function App() {
     showToast('La cita ha sido cancelada y el horario quedó libre.');
   };
 
-  // Business Management Handlers (Persisted to Cloud SQL)
+  // Business Management Handlers (Persisted to Cloud SQL / Offline Queue)
   const handleSaveService = (svc: ServiceItem, isNew: boolean) => {
     if (isNew) {
       setServices((prev) => [svc, ...prev]);
@@ -323,14 +503,12 @@ export default function App() {
       );
     }
 
-    fetch('/api/services', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify(svc),
-    }).catch((err) => console.warn('Service persist notice:', err));
+    dispatchSyncAction(
+      '/api/services',
+      'POST',
+      svc,
+      `Servicio "${svc.name}"`
+    );
   };
 
   const handleToggleServiceActive = (id: string) => {
@@ -343,14 +521,12 @@ export default function App() {
           `Servicio "${s.name}" ${next ? 'activado' : 'pausado'} para clientes.`
         );
 
-        fetch('/api/services', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
-          body: JSON.stringify(updated),
-        }).catch((err) => console.warn('Toggle service persist notice:', err));
+        dispatchSyncAction(
+          '/api/services',
+          'POST',
+          updated,
+          `Estado servicio "${s.name}"`
+        );
 
         return updated;
       })
@@ -362,12 +538,12 @@ export default function App() {
     setServices((prev) => prev.filter((s) => s.id !== id));
     if (found) showToast(`Servicio "${found.name}" eliminado.`);
 
-    fetch(`/api/services/${id}`, {
-      method: 'DELETE',
-      headers: {
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-    }).catch((err) => console.warn('Delete service notice:', err));
+    dispatchSyncAction(
+      `/api/services/${id}`,
+      'DELETE',
+      undefined,
+      `Eliminar servicio "${found?.name || id}"`
+    );
   };
 
   const handleSaveProfessional = (pro: Professional, isNew: boolean) => {
@@ -379,14 +555,12 @@ export default function App() {
       showToast(`Perfil de ${pro.name} actualizado.`);
     }
 
-    fetch('/api/professionals', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify(pro),
-    }).catch((err) => console.warn('Professional persist notice:', err));
+    dispatchSyncAction(
+      '/api/professionals',
+      'POST',
+      pro,
+      `Profesional "${pro.name}"`
+    );
   };
 
   const handleDeleteProfessional = (id: string) => {
@@ -394,12 +568,12 @@ export default function App() {
     setProfessionals((prev) => prev.filter((p) => p.id !== id));
     if (found) showToast(`${found.name} eliminado del equipo.`);
 
-    fetch(`/api/professionals/${id}`, {
-      method: 'DELETE',
-      headers: {
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-    }).catch((err) => console.warn('Delete professional notice:', err));
+    dispatchSyncAction(
+      `/api/professionals/${id}`,
+      'DELETE',
+      undefined,
+      `Eliminar profesional "${found?.name || id}"`
+    );
   };
 
   const handleToggleWorkingDay = (day: DayName) => {
@@ -433,40 +607,36 @@ export default function App() {
       `Bloqueo aplicado: ${block.day} de ${block.startTime} a ${block.endTime}.`
     );
 
-    fetch('/api/blocked-slots', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify(block),
-    }).catch((err) => console.warn('Blocked slot persist notice:', err));
+    dispatchSyncAction(
+      '/api/blocked-slots',
+      'POST',
+      block,
+      `Bloqueo horario ${block.day}`
+    );
   };
 
   const handleRemoveBlockedSlot = (id: string) => {
     setBlockedSlots((prev) => prev.filter((b) => b.id !== id));
     showToast('Bloqueo eliminado. Horarios disponibles nuevamente.');
 
-    fetch(`/api/blocked-slots/${id}`, {
-      method: 'DELETE',
-      headers: {
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-    }).catch((err) => console.warn('Delete blocked slot notice:', err));
+    dispatchSyncAction(
+      `/api/blocked-slots/${id}`,
+      'DELETE',
+      undefined,
+      `Eliminar bloqueo ${id}`
+    );
   };
 
   const handleSaveWhatsAppConfig = (cfg: WhatsAppConfig) => {
     setWhatsAppConfig(cfg);
     showToast('Configuración y plantilla de WhatsApp guardadas.');
 
-    fetch('/api/whatsapp-config', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify(cfg),
-    }).catch((err) => console.warn('WhatsApp config persist notice:', err));
+    dispatchSyncAction(
+      '/api/whatsapp-config',
+      'POST',
+      cfg,
+      'Configuración de WhatsApp'
+    );
   };
 
   const handleUpdateAppointmentStatus = (
@@ -495,11 +665,12 @@ export default function App() {
     });
     showToast(`Negocio "${updatedVenue.name}" guardado correctamente.`);
 
-    fetch('/api/venues', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedVenue),
-    }).catch((err) => console.warn('Venue persist notice:', err));
+    dispatchSyncAction(
+      '/api/venues',
+      'POST',
+      updatedVenue,
+      `Negocio "${updatedVenue.name}"`
+    );
   };
 
   const clientNavItems: Array<{
@@ -876,6 +1047,37 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Offline Mode & Sync Queue Status Badge */}
+            {!isOnline ? (
+              <div
+                title="Modo sin conexión: los cambios de tu negocio se guardan localmente y se sincronizarán al volver a conectar."
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold"
+              >
+                <WifiOff className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Offline</span>
+                {pendingSyncCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-[9px] font-mono font-black tabular-nums">
+                    {pendingSyncCount} pend.
+                  </span>
+                )}
+              </div>
+            ) : pendingSyncCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => triggerSync(true)}
+                title="Hay cambios locales pendientes. Haz clic para sincronizarlos con el servidor."
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-champagne-500/15 border border-champagne-500/30 text-champagne-700 dark:text-champagne-400 text-[10px] font-bold hover:bg-champagne-500/25 transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">
+                  {isSyncing ? 'Sincronizando...' : `${pendingSyncCount} por sincronizar`}
+                </span>
+                <span className="sm:hidden font-mono text-[9px] font-black">
+                  {pendingSyncCount}
+                </span>
+              </button>
+            ) : null}
+
             {role === 'client' ? (
               <button
                 type="button"

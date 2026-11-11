@@ -20,7 +20,7 @@ export const VenueMapModal: React.FC<VenueMapModalProps> = ({ venue, onClose }) 
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 mt-4 rounded-xl overflow-hidden">
+        <div className="flex-1 mt-4 rounded-xl overflow-hidden relative border border-sand-200 dark:border-obsidian-800">
           <Map
             defaultZoom={15}
             defaultCenter={{ lat: venue.lat || 6.2442, lng: venue.lng || -75.5736 }}
@@ -31,6 +31,19 @@ export const VenueMapModal: React.FC<VenueMapModalProps> = ({ venue, onClose }) 
               <AdvancedMarker position={{ lat: venue.lat, lng: venue.lng }} />
             )}
           </Map>
+        </div>
+        <div className="pt-3 border-t border-sand-200 dark:border-obsidian-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <span className="text-slate-500 dark:text-slate-400 truncate max-w-sm">
+            {venue.address || venue.location}
+          </span>
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address || venue.location || venue.name)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-bold transition-colors text-center shrink-0"
+          >
+            Abrir en Google Maps
+          </a>
         </div>
       </div>
     </div>

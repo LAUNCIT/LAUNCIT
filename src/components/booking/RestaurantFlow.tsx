@@ -103,7 +103,7 @@ export const RestaurantFlow: React.FC<FlowProps> = ({
                 <h3 className="font-bold text-lg text-slate-900 dark:text-white">Fecha de reserva</h3>
                 <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
                   {UPCOMING_DATES.map(d => {
-                    const isOpen = workingDays[d.dayName]?.isOpen;
+                    const isOpen = workingDays?.[d.dayName]?.isOpen ?? true;
                     return (
                       <button key={d.dateKey} disabled={!isOpen} onClick={() => { setSelectedDate(d.dateKey); setSelectedDayName(d.dayName); }} className={`flex-shrink-0 w-16 p-4 rounded-2xl border flex flex-col items-center gap-1 transition-all glow-up ${!isOpen ? 'opacity-30 cursor-not-allowed bg-sand-100' : selectedDate === d.dateKey ? 'border-champagne-500 bg-champagne-500 text-slate-950 font-bold shadow-lg shadow-champagne-500/20' : 'border-sand-200 dark:border-obsidian-800 bg-white dark:bg-obsidian-900'}`}>
                         <span className="text-[10px] uppercase font-bold opacity-60">{d.shortDay}</span>

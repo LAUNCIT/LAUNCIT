@@ -82,7 +82,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     const text = getCompiledWhatsAppMessage();
     const targetPhone = confirmedAppt.phone || whatsAppConfig?.businessPhone || '+573124567890';
     const url = generateWhatsAppUrl(targetPhone, text);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    try {
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        window.location.href = url;
+      }
+    } catch {
+      window.location.href = url;
+    }
   };
 
   return (

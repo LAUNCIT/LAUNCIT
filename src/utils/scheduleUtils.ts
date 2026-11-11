@@ -6,11 +6,15 @@ import {
   WorkingDayConfig,
 } from '../types';
 
-export function formatCOP(amount: number): string {
+export function formatCOP(amount?: number | null): string {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0 COP';
+  }
   return `$${amount.toLocaleString('es-CO')} COP`;
 }
 
-export function parseTimeToMinutes(timeStr: string): number {
+export function parseTimeToMinutes(timeStr?: string | null): number {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
   const clean = timeStr.trim().toUpperCase();
   const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
   if (!match) return 0;
@@ -38,23 +42,23 @@ export function evaluateSlotAvailability(params: {
   dateKey: string;
   timeStr: string;
   proId: string; // 'any' or specific proId
-  workingDays: Record<DayName, WorkingDayConfig>;
-  blockedSlots: BlockedSlot[];
-  appointments: Appointment[];
-  professionals: Professional[];
+  workingDays?: Record<DayName, WorkingDayConfig>;
+  blockedSlots?: BlockedSlot[];
+  appointments?: Appointment[];
+  professionals?: Professional[];
 }): SlotAvailability {
   const {
     dayName,
     dateKey,
     timeStr,
     proId,
-    workingDays,
-    blockedSlots,
-    appointments,
-    professionals,
+    workingDays = {} as Record<DayName, WorkingDayConfig>,
+    blockedSlots = [],
+    appointments = [],
+    professionals = [],
   } = params;
 
-  const dayConfig = workingDays[dayName];
+  const dayConfig = workingDays?.[dayName];
   if (!dayConfig || !dayConfig.isOpen) {
     return {
       available: false,

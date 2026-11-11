@@ -181,6 +181,7 @@ export const DailyRevenueTrendChart: React.FC<DailyRevenueTrendChartProps> = ({
     const confirmed = appointments.filter((a) => a.status === 'Confirmada');
 
     confirmed.forEach((apt) => {
+      if (!apt.dateKey || typeof apt.dateKey !== 'string') return;
       // Extract numeric day from dateKey (e.g. "Dom, 01 Nov" or "Mar, 10 Nov")
       const match = apt.dateKey.match(/\b0?([1-9]|[12][0-9]|3[01])\b/);
       if (match) {

@@ -809,7 +809,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {
-                  DAYS_ORDER.filter((d) => !workingDays[d].isOpen).length
+                  DAYS_ORDER.filter((d) => !workingDays[d]?.isOpen).length
                 }{' '}
                 día(s) cerrado(s) por semana
               </p>
@@ -1174,18 +1174,19 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                 </div>
                 {DAYS_ORDER.map((day) => {
                   const cfg = workingDays[day];
+                  const isOpen = cfg?.isOpen ?? false;
                   return (
                     <div
                       key={day}
                       className={`p-3 border-r last:border-r-0 border-sand-200 dark:border-obsidian-800 ${
-                        !cfg.isOpen
+                        !isOpen
                           ? 'bg-rose-500/5 text-rose-600 dark:text-rose-400'
                           : 'text-slate-900 dark:text-white'
                       }`}
                     >
                       <p className="font-bold">{day.slice(0, 3)}</p>
                       <p className="text-[10px] font-mono font-normal opacity-80 mt-0.5 tabular-nums">
-                        {cfg.isOpen ? `${cfg.openTime.replace(' ', '')}` : 'Cerrado'}
+                        {isOpen ? `${cfg?.openTime?.replace(' ', '') || '08:00AM'}` : 'Cerrado'}
                       </p>
                     </div>
                   );
@@ -1204,10 +1205,10 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
 
                       {DAYS_ORDER.map((day) => {
                         const cfg = workingDays[day];
-                        const openMin = parseTimeToMinutes(cfg.openTime);
-                        const closeMin = parseTimeToMinutes(cfg.closeTime);
+                        const openMin = parseTimeToMinutes(cfg?.openTime || '08:00 AM');
+                        const closeMin = parseTimeToMinutes(cfg?.closeTime || '07:00 PM');
                         const isClosed =
-                          !cfg.isOpen || slotMin < openMin || slotMin >= closeMin;
+                          !cfg?.isOpen || slotMin < openMin || slotMin >= closeMin;
 
                         if (isClosed) {
                           return (
@@ -1559,7 +1560,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
               {DAYS_ORDER.map((day) => {
-                const cfg = workingDays[day];
+                const cfg = workingDays[day] || { isOpen: false, openTime: '08:00 AM', closeTime: '07:00 PM' };
                 return (
                   <div
                     key={day}
@@ -3107,7 +3108,12 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                         waTestPhone,
                         currentPreviewMessage
                       );
-                      window.open(url, '_blank', 'noopener,noreferrer');
+                      try {
+                        const win = window.open(url, '_blank', 'noopener,noreferrer');
+                        if (!win) window.location.href = url;
+                      } catch {
+                        window.location.href = url;
+                      }
                       onShowToast('Abriendo enlace de confirmación en WhatsApp Web...');
                     }}
                     className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
@@ -3155,7 +3161,12 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                         waTestPhone,
                         currentPreviewMessage
                       );
-                      window.open(url, '_blank', 'noopener,noreferrer');
+                      try {
+                        const win = window.open(url, '_blank', 'noopener,noreferrer');
+                        if (!win) window.location.href = url;
+                      } catch {
+                        window.location.href = url;
+                      }
                       onShowToast('Abriendo WhatsApp Web con el mensaje compilado...');
                     }}
                     className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"

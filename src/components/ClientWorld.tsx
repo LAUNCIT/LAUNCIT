@@ -246,14 +246,15 @@ export const ClientWorld: React.FC<ClientWorldProps> = ({
   }, [venues, services, selectedCategory, selectedSubCategory, searchQuery, sportPriceFilter, sportLocationFilter, nightLightingOnly]);
 
   const matchedAppointments = useMemo(() => {
-    const cleanTarget = lookupPhone.replace(/[\s+\-()]/g, '').toLowerCase();
+    const cleanTarget = (lookupPhone || '').replace(/[\s+\-()]/g, '').toLowerCase();
     if (!cleanTarget) return [];
     return appointments.filter((a) => {
-      const cleanApptPhone = a.phone.replace(/[\s+\-()]/g, '').toLowerCase();
+      const cleanApptPhone = (a.phone || '').replace(/[\s+\-()]/g, '').toLowerCase();
+      const codeMatches = (a.code || '').toLowerCase() === lookupPhone.trim().toLowerCase();
       return (
         cleanApptPhone.includes(cleanTarget) ||
         cleanTarget.includes(cleanApptPhone) ||
-        a.code.toLowerCase() === lookupPhone.trim().toLowerCase()
+        codeMatches
       );
     });
   }, [appointments, lookupPhone]);

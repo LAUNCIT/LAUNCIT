@@ -182,7 +182,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
                 <h3 className="font-bold text-lg text-slate-900 dark:text-white">Selecciona la fecha</h3>
                 <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
                   {UPCOMING_DATES.map(d => {
-                    const isOpen = workingDays[d.dayName]?.isOpen;
+                    const isOpen = workingDays?.[d.dayName]?.isOpen ?? true;
                     return (
                       <button
                         key={d.dateKey}
