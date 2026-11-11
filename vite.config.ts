@@ -11,7 +11,7 @@ export default defineConfig(() => {
   const isSingleFile = process.env.SINGLE_FILE === 'true';
 
   return {
-    base: './',
+    base: '/LAUNCIT/',
     plugins: [
       react(),
       tailwindcss(),
