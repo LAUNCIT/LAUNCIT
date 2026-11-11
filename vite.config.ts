@@ -8,9 +8,15 @@ import { defineConfig } from 'vite';
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(() => {
+  const isSingleFile = process.env.SINGLE_FILE === 'true';
+
   return {
     base: './',
-    plugins: [react(), tailwindcss(), viteSingleFile()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      ...(isSingleFile ? [viteSingleFile()] : []),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(rootDir, '.'),
@@ -24,7 +30,18 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      emptyOutDir: true,
       chunkSizeWarningLimit: 5000,
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+        },
+      },
     },
   };
 });
+
