@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Realidad Aumentada — Launcit</title>
+  <meta name="description" content="Visualiza el logotipo 3D en Realidad Aumentada en tu espacio con Launcit" />
+  <meta name="theme-color" content="#09090C" />
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Google Model Viewer (WebAR standard for Android Scene Viewer & iOS Quick Look) -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: {
+              950: '#09090C',
+              900: '#111116',
+              850: '#17171F',
+              800: '#1F1F2A',
+              750: '#272735',
+            },
+            champagne: {
+              400: '#E8CA8C',
+              500: '#D4AF37',
+              600: '#B89327',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Model Viewer Custom Styling */
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      --poster-color: transparent;
+      --progress-bar-color: #D4AF37;
+      --progress-mask: transparent;
+    }
+
+    /* Ambient Pulsing Glow */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.05); }
+    }
+    .ambient-glow {
+      animation: pulseGlow 5s infinite ease-in-out;
+    }
+
+    /* Shimmer Effect on AR Button */
+    .shimmer-btn {
+      background: linear-gradient(90deg, #4f46e5 0%, #6366f1 50%, #4f46e5 100%);
+      background-size: 200% auto;
+      transition: all 0.3s ease;
+    }
+    .shimmer-btn:hover {
+      background-position: right center;
+    }
+  </style>
+</head>
+
+<body class="bg-obsidian-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-champagne-500 selection:text-slate-950 overflow-x-hidden font-sans">
+  
+  <!-- Ambient background lighting effects -->
+  <div class="fixed top-[-100px] left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-[140px] pointer-events-none ambient-glow"></div>
+  <div class="fixed bottom-[-100px] right-[-100px] w-[350px] h-[350px] bg-champagne-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <!-- Main Container (Mobile-first app style) -->
+  <main class="relative z-10 w-full max-w-md mx-auto p-4 sm:p-6 flex flex-col flex-1 justify-between gap-4">
+
+    <!-- Top Navigation & Brand Header -->
+    <header class="space-y-3 pt-2 text-center">
+      <div class="flex items-center justify-between gap-2 px-1">
+        <!-- Logo & Brand Badge -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-obsidian-900 border border-champagne-500/30 text-champagne-400 text-[11px] font-mono font-bold tracking-widest uppercase shadow-lg">
+          <i class="fa-solid fa-cube text-champagne-400"></i>
+          <span>LAUNCIT AR</span>
+        </div>
+
+        <!-- Share Button -->
+        <button id="btn-share" type="button" class="w-9 h-9 rounded-full bg-obsidian-900/90 border border-obsidian-800 text-slate-400 hover:text-white flex items-center justify-center transition-all hover:border-champagne-500/40">
+          <i class="fa-solid fa-share-nodes text-xs"></i>
+        </button>
+      </div>
+
+      <!-- Scanned Business Name Presentation -->
+      <div class="space-y-1 pt-1">
+        <p class="text-[10px] font-bold tracking-widest uppercase font-mono text-indigo-400">
+          Experiencia Interactiva 3D
+        </p>
+        <h1 id="biz-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight break-words">
+          Cargando Negocio...
+        </h1>
+        <p class="text-xs text-slate-400">
+          Explora el logotipo oficial de <span class="text-slate-200 font-semibold">Launcit</span> en 360° o proyéctalo en Realidad Aumentada sobre tu mesa o espacio.
+        </p>
+      </div>
+    </header>
+
+    <!-- 3D WebAR Viewer Card -->
+    <section class="relative w-full aspect-square max-h-[380px] rounded-3xl bg-gradient-to-b from-obsidian-900 via-obsidian-900 to-obsidian-950 border border-indigo-500/30 shadow-2xl overflow-hidden flex items-center justify-center">
+      
+      <!-- Interactive 360 Hint Badge -->
+      <div class="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-xl bg-obsidian-950/80 backdrop-blur-md border border-white/10 text-[10px] font-mono text-slate-300 flex items-center gap-1.5 pointer-events-none">
+        <i class="fa-solid fa-arrows-rotate text-champagne-400 text-xs animate-spin" style="animation-duration: 8s;"></i>
+        <span>Gira 360° con tu dedo</span>
+      </div>
+
+      <!-- Loading / Progress Indicator -->
+      <div id="loading-spinner" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-obsidian-950/80 backdrop-blur-sm transition-opacity duration-300">
+        <div class="w-10 h-10 border-2 border-indigo-500/30 border-t-champagne-500 rounded-full animate-spin mb-2"></div>
+        <span class="text-xs font-mono text-slate-400 tracking-wider">Cargando modelo 3D...</span>
+      </div>
+
+      <!-- Google <model-viewer> Element -->
+      <model-viewer
+        id="ar-viewer"
+        src="/logo_launcit.glb"
+        poster="/logo.png"
+        ar
+        ar-modes="webxr scene-viewer quick-look"
+        camera-controls
+        auto-rotate
+        rotation-per-second="25deg"
+        shadow-intensity="1.5"
+        shadow-softness="0.8"
+        exposure="1.0"
+        environment-image="neutral"
+        touch-action="pan-y"
+        alt="Logotipo 3D Oficial de Launcit en Realidad Aumentada"
+      >
+        <!-- Native AR Button Slot inside model-viewer -->
+        <button slot="ar-button" id="default-ar-button" class="hidden" aria-hidden="true"></button>
+      </model-viewer>
+
+    </section>
+
+    <!-- Controls & Primary AR Call-to-Action -->
+    <section class="space-y-3 w-full">
+      
+      <!-- Primary Big Glowing AR Button -->
+      <button
+        id="btn-launch-ar"
+        type="button"
+        class="shimmer-btn w-full py-4 px-6 rounded-2xl text-white font-extrabold text-sm sm:text-base uppercase tracking-wider flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all"
+      >
+        <i class="fa-solid fa-camera-retro text-lg animate-pulse"></i>
+        <span>Ver en tu espacio (AR)</span>
+      </button>
+
+      <!-- Feedback / Guidance Notification -->
+      <div id="ar-status" class="hidden p-3 rounded-xl bg-indigo-950/80 border border-indigo-500/40 text-xs text-indigo-200 text-center font-medium">
+      </div>
+
+      <!-- Secondary Navigation: Enter Venue Profile / Book Appointment -->
+      <div class="pt-1 flex items-center justify-center gap-3">
+        <a 
+          id="btn-visit-portal" 
+          href="/" 
+          class="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-champagne-400 transition-colors py-1"
+        >
+          <i class="fa-solid fa-calendar-check text-champagne-500"></i>
+          <span>Agendar Cita en este Negocio</span>
+          <i class="fa-solid fa-arrow-right text-[10px]"></i>
+        </a>
+      </div>
+    </section>
+
+    <!-- Footer Copyright & Power-by -->
+    <footer class="pt-3 pb-2 text-center text-[10px] text-slate-500 font-mono">
+      <span>Desarrollado con WebAR</span> • <span class="text-champagne-400 font-bold">Launcit 3D</span>
+    </footer>
+
+  </main>
+
+  <!-- Interactive JavaScript Logic -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const viewer = document.getElementById('ar-viewer');
+      const bizTitle = document.getElementById('biz-title');
+      const btnLaunchAr = document.getElementById('btn-launch-ar');
+      const btnShare = document.getElementById('btn-share');
+      const loadingSpinner = document.getElementById('loading-spinner');
+      const arStatus = document.getElementById('ar-status');
+      const btnVisitPortal = document.getElementById('btn-visit-portal');
+
+      // 1. Parse Business Name from URL Query Parameter (?negocio=... or ?id=...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const rawBizName = urlParams.get('negocio') || urlParams.get('venue') || urlParams.get('nombre') || urlParams.get('id');
+      
+      const businessName = rawBizName ? decodeURIComponent(rawBizName).trim() : 'Negocio Asociado';
+      bizTitle.textContent = businessName;
+      document.title = `${businessName} — Realidad Aumentada Launcit`;
+
+      // Update link back to main booking portal with parameter
+      if (btnVisitPortal) {
+        btnVisitPortal.href = `/?negocio=${encodeURIComponent(businessName)}`;
+      }
+
+      // 2. Hide Spinner when 3D Model is Loaded
+      viewer.addEventListener('load', () => {
+        if (loadingSpinner) {
+          loadingSpinner.style.opacity = '0';
+          setTimeout(() => { loadingSpinner.style.display = 'none'; }, 300);
+        }
+      });
+
+      // 3. Fallback if model fails (e.g. if logo_launcit.glb was unreachable)
+      viewer.addEventListener('error', (e) => {
+        console.warn('Notice loading primary GLB, activating fallback model:', e);
+        if (loadingSpinner) {
+          loadingSpinner.style.display = 'none';
+        }
+        // Fallback to demo model if local GLB is missing
+        if (!viewer.src.includes('Astronaut.glb')) {
+          viewer.src = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+        }
+      });
+
+      // 4. Activate Native Augmented Reality (Android Scene Viewer / iOS Quick Look / WebXR)
+      btnLaunchAr.addEventListener('click', () => {
+        if (typeof viewer.activateAR === 'function') {
+          try {
+            viewer.activateAR();
+          } catch (err) {
+            showStatusMessage('Abre este enlace desde tu celular Android o iPhone para proyectar en tu cámara.');
+          }
+        } else {
+          // Trigger slot fallback button if available
+          const slotBtn = document.getElementById('default-ar-button');
+          if (slotBtn) {
+            slotBtn.click();
+          } else {
+            showStatusMessage('Abre este enlace desde un celular para activar la Realidad Aumentada nativa.');
+          }
+        }
+      });
+
+      // 5. Native Share API
+      btnShare.addEventListener('click', () => {
+        const shareData = {
+          title: `${businessName} — Realidad Aumentada Launcit`,
+          text: `Mira la experiencia 3D y Realidad Aumentada de ${businessName} en Launcit:`,
+          url: window.location.href,
+        };
+
+        if (navigator.share) {
+          navigator.share(shareData).catch(() => {});
+        } else if (navigator.clipboard) {
+          navigator.clipboard.writeText(window.location.href);
+          showStatusMessage('¡Enlace de Realidad Aumentada copiado al portapapeles!');
+        }
+      });
+
+      function showStatusMessage(msg) {
+        if (!arStatus) return;
+        arStatus.textContent = msg;
+        arStatus.classList.remove('hidden');
+        setTimeout(() => {
+          arStatus.classList.add('hidden');
+        }, 4000);
+      }
+    });
+  </script>
+</body>
+</html>

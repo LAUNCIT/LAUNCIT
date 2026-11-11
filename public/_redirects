@@ -1,0 +1,6 @@
+# Direct rules for 3D assets and AR page
+/logo_launcit.glb    /logo_launcit.glb    200
+/ver.html            /ver.html            200
+
+# SPA fallback for Netlify
+/*                   /index.html          200

@@ -1,0 +1,6 @@
+{
+  "name": "Launcit",
+  "description": "Launcit — Tu tiempo, tu reserva, tu lugar. Plataforma de reservas directas sin registro para escenarios deportivos, canchas sintéticas, restaurantes, fincas, Airbnb, hoteles, spas y más.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

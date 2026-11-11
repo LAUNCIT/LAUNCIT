@@ -1,0 +1,90 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-obsidian-950: #09090C;
+  --color-obsidian-900: #111116;
+  --color-obsidian-850: #17171F;
+  --color-obsidian-800: #1F1F2A;
+  --color-obsidian-750: #272735;
+  --color-obsidian-700: #323243;
+  --color-obsidian-600: #46465C;
+
+  --color-sand-50: #FAF9F6;
+  --color-sand-100: #F3F1EC;
+  --color-sand-200: #E7E4DC;
+  --color-sand-300: #D5D1C5;
+  --color-sand-800: #434038;
+  --color-sand-900: #23221E;
+
+  --color-champagne-300: #F6E6BC;
+  --color-champagne-400: #E8CA8C;
+  --color-champagne-500: #D4AF37;
+  --color-champagne-600: #B89327;
+
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --animate-glow: glow 2s ease-in-out infinite;
+
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(212, 175, 55, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.6); }
+  }
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    letter-spacing: -0.012em;
+  }
+
+  button:not(:disabled),
+  select:not(:disabled),
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glow-up {
+  @apply transition-all duration-300;
+}
+.glow-up:hover:not(:disabled) {
+  @apply scale-[1.01] shadow-[0_0_20px_rgba(212,175,55,0.25)] border-champagne-500/50 bg-champagne-500/5;
+}
+.glow-up:active:not(:disabled) {
+  @apply scale-[0.98];
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 155, 0.28);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 155, 0.48);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
