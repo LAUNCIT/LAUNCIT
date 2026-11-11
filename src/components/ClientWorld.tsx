@@ -28,6 +28,11 @@ import {
   User,
   X,
   XCircle,
+  CreditCard,
+  Clock,
+  ShieldCheck,
+  RefreshCw,
+  MessageSquare,
 } from 'lucide-react';
 import {
   Appointment,
@@ -168,6 +173,8 @@ export const ClientWorld: React.FC<ClientWorldProps> = ({
   >('all');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [exploreFaqIndex, setExploreFaqIndex] = useState<number | null>(0);
+  const [faqCategoryFilter, setFaqCategoryFilter] = useState<string>('all');
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [galleryVenue, setGalleryVenue] = useState<Venue | null>(null);
   const [mapModalVenue, setMapModalVenue] = useState<Venue | null>(null);
@@ -262,20 +269,48 @@ export const ClientWorld: React.FC<ClientWorldProps> = ({
 
   const faqs = [
     {
+      id: 'faq-pagos',
+      q: '¿Cuáles son los métodos de pago aceptados?',
+      a: 'Pagas directamente en el establecimiento al momento de tu cita o servicio. La gran mayoría de comercios aceptan efectivo, transferencias digitales inmediatas (Nequi, Daviplata, Dale!), tarjetas débito/crédito físicas y códigos QR / PSE. Para servicios con tarifa alta o reservas especiales (como canchas deportivas completas o eventos privados), el establecimiento puede solicitar un anticipo o seña que coordinarás directamente por WhatsApp.',
+      category: 'pagos',
+      categoryLabel: 'Métodos de Pago',
+      highlight: true,
+    },
+    {
+      id: 'faq-cancelacion',
+      q: '¿Cuál es la política de cancelación o modificación de citas?',
+      a: '¡Total libertad y sin penalizaciones! Puedes consultar o cancelar tu reserva en cualquier momento ingresando tu número o código de cita (ej. GLW-4091) en la pestaña "Consultar mi Reserva". Para reprogramar o en caso de imprevistos, te sugerimos avisar con al menos 2 a 4 horas de anticipación para que el comercio pueda reasignar el horario a otro cliente.',
+      category: 'cancelacion',
+      categoryLabel: 'Políticas de Cancelación',
+      highlight: true,
+    },
+    {
+      id: 'faq-registro',
       q: '¿Debo crear una cuenta o registrar una contraseña para reservar?',
-      a: 'No. En Launcit los clientes navegan y agendan de forma totalmente libre. Tu tiempo, tu reserva, tu lugar: solo necesitas tu nombre y número de WhatsApp en el paso final para recibir confirmación instantánea.',
+      a: 'No. En Launcit reservas de forma ágil, libre y sin contraseñas. Solo eliges el servicio, fecha y hora disponible, e ingresas tu nombre y WhatsApp en el paso final para recibir tu confirmación inmediata.',
+      category: 'reserva',
+      categoryLabel: 'Reserva Directa',
     },
     {
+      id: 'faq-notificaciones',
+      q: '¿Cómo recibo la confirmación y recordatorio de mi cita?',
+      a: 'Al completar la reserva, el sistema genera al instante tu código único (ej. GLW-4091) con un comprobante oficial listo para compartir o verificar en WhatsApp. El establecimiento lo recibe en tiempo real en su panel de administración.',
+      category: 'reserva',
+      categoryLabel: 'Confirmación & WhatsApp',
+    },
+    {
+      id: 'faq-disponibilidad',
       q: '¿Por qué algunos días u horarios aparecen cerrados o bloqueados?',
-      a: 'Cada establecimiento administra su calendario inteligente en tiempo real. Si un centro cierra los domingos o bloquea una franja horaria por capacitación, el sistema deshabilita esos turnos automáticamente.',
+      a: 'Cada establecimiento administra su calendario en vivo. Si un especialista ya tiene turno ocupado, si el local cierra por descanso dominical/festivo o si hay un bloqueo temporal de instalaciones, el sistema inhabilita esos horarios automáticamente para evitar colisiones.',
+      category: 'horarios',
+      categoryLabel: 'Disponibilidad en Vivo',
     },
     {
-      q: '¿Cómo consulto o cancelo una cita ya agendada?',
-      a: 'Entra a la pestaña "Consultar mi Reserva" e ingresa tu número de WhatsApp o código de reserva (ej. GLW-4091) para ver el estado de tu cita al instante.',
-    },
-    {
+      id: 'faq-precios',
       q: '¿Los precios mostrados en COP son finales?',
-      a: 'Sí. Los precios en pesos colombianos (COP) están sincronizados directamente con el tarifario oficial configurado por cada establecimiento.',
+      a: 'Sí. Todos los precios en pesos colombianos (COP) son 100% transparentes y corresponden al tarifario oficial vigente fijado por el establecimiento, sin comisiones sorpresa ni cargos ocultos.',
+      category: 'pagos',
+      categoryLabel: 'Tarifas Transparentes',
     },
   ];
 
@@ -436,44 +471,120 @@ export const ClientWorld: React.FC<ClientWorldProps> = ({
   }
 
   if (activeView === 'faq') {
+    const displayedFaqs =
+      faqCategoryFilter === 'all'
+        ? faqs
+        : faqs.filter((f) => f.category === faqCategoryFilter);
+
+    const faqFilters = [
+      { id: 'all', label: 'Todas' },
+      { id: 'pagos', label: 'Métodos de Pago' },
+      { id: 'cancelacion', label: 'Cancelación & Reprogramación' },
+      { id: 'reserva', label: 'Reservas' },
+      { id: 'horarios', label: 'Horarios' },
+    ];
+
     return (
-      <section className="max-w-2xl mx-auto space-y-6">
-        <div className="space-y-1.5">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Ayuda &amp; Preguntas Frecuentes
+      <section className="max-w-3xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-champagne-500/10 border border-champagne-500/20 text-champagne-600 dark:text-champagne-400 text-xs font-bold">
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Centro de Ayuda al Cliente</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Preguntas Frecuentes
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Información rápida sobre reservas directas sin registro y confirmación por WhatsApp.
+            Resuelve todas tus dudas sobre métodos de pago aceptados, políticas de cancelación sin penalización y reservas directas sin registro.
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 divide-y divide-sand-200 dark:divide-obsidian-800">
-          {faqs.map((item, idx) => {
+        {/* Category Filters */}
+        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+          {faqFilters.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setFaqCategoryFilter(tab.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${
+                faqCategoryFilter === tab.id
+                  ? 'bg-slate-900 text-white border-transparent dark:bg-champagne-500 dark:text-slate-950'
+                  : 'bg-white dark:bg-obsidian-900 border-sand-200 dark:border-obsidian-800 text-slate-600 dark:text-slate-400 hover:border-champagne-500/40'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Accordion List */}
+        <div className="rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 divide-y divide-sand-200 dark:divide-obsidian-800 overflow-hidden shadow-xs">
+          {displayedFaqs.map((item, idx) => {
             const isOpen = openFaqIndex === idx;
             return (
-              <div key={`faq-${idx}`} className="p-5">
+              <div key={item.id || `faq-${idx}`} className="transition-colors">
                 <button
                   type="button"
                   onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                  className="w-full flex items-center justify-between gap-4 text-left"
+                  className="w-full p-4 sm:p-5 flex items-start justify-between gap-4 text-left hover:bg-sand-50 dark:hover:bg-obsidian-850/60 transition-colors"
                 >
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">
-                    {item.q}
-                  </span>
-                  {isOpen ? (
-                    <ChevronUp className="w-4 h-4 text-champagne-500 shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                  )}
+                  <div className="flex items-start gap-3.5">
+                    <span className="mt-0.5 p-2 rounded-xl bg-sand-100 dark:bg-obsidian-800 text-slate-600 dark:text-champagne-400 shrink-0">
+                      {item.category === 'pagos' ? (
+                        <CreditCard className="w-4 h-4" />
+                      ) : item.category === 'cancelacion' ? (
+                        <RefreshCw className="w-4 h-4" />
+                      ) : item.category === 'horarios' ? (
+                        <Clock className="w-4 h-4" />
+                      ) : (
+                        <ShieldCheck className="w-4 h-4" />
+                      )}
+                    </span>
+                    <div className="space-y-1">
+                      <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-sand-100 dark:bg-obsidian-800 text-slate-600 dark:text-slate-300">
+                        {item.categoryLabel}
+                      </span>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                        {item.q}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="shrink-0 pt-1">
+                    {isOpen ? (
+                      <ChevronUp className="w-4 h-4 text-champagne-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
                 </button>
                 {isOpen && (
-                  <p className="mt-2.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {item.a}
-                  </p>
+                  <div className="px-5 pb-5 pt-1 pl-14 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-sand-100 dark:border-obsidian-850 bg-sand-50/50 dark:bg-obsidian-950/30">
+                    <p className="pt-2">{item.a}</p>
+                  </div>
                 )}
               </div>
             );
           })}
+        </div>
+
+        {/* Support Card */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-sand-100 dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-champagne-500" />
+              <span>¿Tienes una consulta específica sobre tu reserva?</span>
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Usa la pestaña &quot;Consultar mi Reserva&quot; con tu número de WhatsApp para ver detalles o cancelar sin complicaciones.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onLookupPhoneChange('+57 312 456 7890')}
+            className="px-4 py-2 rounded-xl bg-champagne-500 text-slate-950 text-xs font-bold hover:bg-champagne-400 transition-colors whitespace-nowrap shrink-0"
+          >
+            Ver Mi Cita
+          </button>
         </div>
       </section>
     );
@@ -790,6 +901,79 @@ export const ClientWorld: React.FC<ClientWorldProps> = ({
             })}
           </div>
         )}
+      </section>
+
+      {/* Sección Desplegable de Preguntas Frecuentes (FAQ Accordion) */}
+      <section className="pt-4 pb-2 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sand-200 dark:border-obsidian-800 pb-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-champagne-500/10 text-champagne-600 dark:text-champagne-400">
+                <HelpCircle className="w-4 h-4" />
+              </span>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Preguntas Frecuentes
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Consulta dudas rápidas sobre métodos de pago en el local, políticas de cancelación y reservas sin registro.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400 shrink-0">
+            {faqs.length} consultas frecuentes
+          </span>
+        </div>
+
+        <div className="rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 divide-y divide-sand-200 dark:divide-obsidian-800 overflow-hidden shadow-xs">
+          {faqs.map((item, idx) => {
+            const isOpen = exploreFaqIndex === idx;
+            return (
+              <div key={item.id || `explore-faq-${idx}`} className="transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setExploreFaqIndex(isOpen ? null : idx)}
+                  className="w-full p-4 sm:p-5 flex items-start justify-between gap-4 text-left hover:bg-sand-50 dark:hover:bg-obsidian-850/60 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 p-1.5 rounded-lg bg-sand-100 dark:bg-obsidian-800 text-slate-600 dark:text-champagne-400 shrink-0">
+                      {item.category === 'pagos' ? (
+                        <CreditCard className="w-4 h-4" />
+                      ) : item.category === 'cancelacion' ? (
+                        <RefreshCw className="w-4 h-4" />
+                      ) : item.category === 'horarios' ? (
+                        <Clock className="w-4 h-4" />
+                      ) : (
+                        <ShieldCheck className="w-4 h-4" />
+                      )}
+                    </span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-sand-100 dark:bg-obsidian-800 text-slate-600 dark:text-slate-300">
+                          {item.categoryLabel}
+                        </span>
+                      </div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">
+                        {item.q}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 pt-1">
+                    {isOpen ? (
+                      <ChevronUp className="w-4 h-4 text-champagne-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-5 sm:px-5 sm:pb-5 pl-12 sm:pl-14 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-sand-100 dark:border-obsidian-850 bg-sand-50/50 dark:bg-obsidian-950/30">
+                    <p className="pt-2.5">{item.a}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* Modal de Galería de Fotos del Local */}
