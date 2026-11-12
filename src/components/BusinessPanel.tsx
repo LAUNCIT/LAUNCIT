@@ -2577,6 +2577,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                   'Hasta 10 especialistas en equipo',
                   'Calendario inteligente con bloqueos horarios',
                   'Confirmaciones automáticas por WhatsApp',
+                  'Burbuja con logo animado al escanear con LAUNCIT',
                 ],
               },
               {
@@ -3724,10 +3725,20 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-2 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-bold text-[10px] uppercase transition-colors inline-flex items-center gap-1"
-                            title="Abrir página WebAR del cliente en pestaña nueva"
+                            title="Abrir página del cliente (ver.html)"
                           >
-                            <span>Abrir AR</span>
+                            <span>VER CLIENTE</span>
                             <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                          <a
+                            href={`./escanear.html?negocio=${encodeURIComponent(v.name)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 rounded-lg bg-champagne-500/20 hover:bg-champagne-500/30 text-champagne-400 font-bold text-[10px] uppercase transition-colors inline-flex items-center gap-1"
+                            title="Probar escáner LAUNCIT"
+                          >
+                            <span>Escáner</span>
+                            <Camera className="w-2.5 h-2.5" />
                           </a>
                         </td>
                       </tr>

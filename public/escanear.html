@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Escáner de Código QR — LAUNCIT</title>
+  <meta name="description" content="Escanea el código QR de un negocio en tiempo real con detección inteligente LAUNCIT" />
+  <meta name="theme-color" content="#09090C" />
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- jsQR Library CDN for real-time QR detection -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: {
+              950: '#09090C',
+              900: '#111116',
+              850: '#17171F',
+              800: '#1F1F2A',
+              750: '#272735',
+            },
+            champagne: {
+              400: '#E8CA8C',
+              500: '#D4AF37',
+              600: '#B89327',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Google Lens style animated floating pill bubble */
+    @keyframes bubblePop {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+      }
+      70% {
+        transform: translate(-50%, -50%) scale(1.08);
+      }
+      100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    @keyframes bubbleFloat {
+      0%, 100% {
+        transform: translate(-50%, -50%) translateY(0px);
+      }
+      50% {
+        transform: translate(-50%, -50%) translateY(-5px);
+      }
+    }
+
+    .lens-bubble-animate {
+      animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, bubbleFloat 3s ease-in-out infinite 0.4s;
+    }
+
+    .lens-pill-shadow {
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.45), 0 10px 30px rgba(0, 0, 0, 0.85);
+    }
+
+    /* Scanner reticle pulse */
+    @keyframes scannerPulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.9; }
+    }
+    .reticle-glow {
+      animation: scannerPulse 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+
+<body class="bg-obsidian-950 text-slate-100 h-screen w-screen overflow-hidden select-none font-sans relative">
+  
+  <!-- Video element for live camera stream -->
+  <video id="webcam" class="absolute inset-0 w-full h-full object-cover z-0" autoplay playsinline muted></video>
+
+  <!-- Hidden canvas for jsQR frame processing -->
+  <canvas id="qr-canvas" class="hidden"></canvas>
+
+  <!-- Dark Vignette Overlay for UI Contrast -->
+  <div class="absolute inset-0 z-10 bg-gradient-to-b from-obsidian-950/80 via-transparent to-obsidian-950/90 pointer-events-none"></div>
+
+  <!-- Top Header Banner -->
+  <header class="absolute top-0 inset-x-0 z-20 p-4 sm:p-6 flex items-center justify-between pointer-events-auto">
+    <!-- Back to portal button -->
+    <a href="./" class="w-10 h-10 rounded-full bg-obsidian-900/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all">
+      <i class="fa-solid fa-arrow-left text-sm"></i>
+    </a>
+
+    <!-- Title Badge -->
+    <div class="px-4 py-2 rounded-full bg-obsidian-900/85 backdrop-blur-md border border-champagne-500/40 text-center shadow-lg">
+      <p class="text-[10px] font-mono font-bold tracking-widest text-champagne-400 uppercase">
+        ESCÁNER INTELIGENTE LAUNCIT
+      </p>
+      <p class="text-xs font-semibold text-white">
+        Apunta al código QR del negocio
+      </p>
+    </div>
+
+    <!-- Switch Camera / Flash Placeholder button -->
+    <button id="btn-toggle-camera" type="button" class="w-10 h-10 rounded-full bg-obsidian-900/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all">
+      <i class="fa-solid fa-rotate text-sm"></i>
+    </button>
+  </header>
+
+  <!-- Center Viewfinder Frame Reticle -->
+  <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none p-6">
+    <div class="relative w-64 h-64 sm:w-72 sm:h-72 border-2 border-dashed border-champagne-500/40 rounded-3xl reticle-glow flex items-center justify-center">
+      <!-- Corner Accents -->
+      <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-champagne-500 rounded-tl-2xl"></div>
+      <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-champagne-500 rounded-tr-2xl"></div>
+      <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-champagne-500 rounded-bl-2xl"></div>
+      <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-champagne-500 rounded-br-2xl"></div>
+
+      <p class="text-[11px] font-mono text-slate-300 text-center px-4 bg-obsidian-950/70 py-1.5 rounded-full backdrop-blur-sm border border-white/10">
+        Centra el QR aquí
+      </p>
+    </div>
+  </div>
+
+  <!-- Camera Permission Error Modal -->
+  <div id="camera-error" class="hidden absolute inset-0 z-40 bg-obsidian-950/95 flex flex-col items-center justify-center p-6 text-center">
+    <div class="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center text-2xl mb-4">
+      <i class="fa-solid fa-camera-retro"></i>
+    </div>
+    <h2 class="text-xl font-bold text-white mb-2">Permiso de Cámara Requerido</h2>
+    <p class="text-xs text-slate-400 max-w-xs mb-6">
+      Para utilizar el escáner inteligente de LAUNCIT, por favor concede permiso a la cámara en tu navegador.
+    </p>
+    <button id="btn-retry-camera" class="px-6 py-3 rounded-xl bg-champagne-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all">
+      Reintentar Acceso a Cámara
+    </button>
+  </div>
+
+  <!-- Google Lens Style Floating Pill Bubble (Positioned dynamically over detected QR) -->
+  <div
+    id="qr-bubble"
+    class="hidden absolute z-30 transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer transition-all duration-100 ease-out"
+  >
+    <div class="lens-bubble-animate lens-pill-shadow flex flex-col items-center gap-1">
+      
+      <!-- Primary Pill Container -->
+      <div class="flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-slate-950/90 backdrop-blur-xl border border-white/50 text-white shadow-2xl hover:border-champagne-400 active:scale-95 transition-all">
+        <!-- Business Logo -->
+        <img
+          id="bubble-logo"
+          src="./logo.png"
+          alt="Logo negocio"
+          class="w-8 h-8 object-contain rounded-full border border-champagne-500/50 bg-obsidian-900 p-0.5 shrink-0"
+        />
+
+        <!-- Business Name -->
+        <div class="text-left pr-1 min-w-[90px] max-w-[160px]">
+          <span id="bubble-biz-name" class="block text-xs font-black text-white truncate tracking-tight">
+            Negocio LAUNCIT
+          </span>
+          <span class="block text-[9px] font-mono text-champagne-400 font-bold uppercase tracking-wider">
+            Reserva Directa
+          </span>
+        </div>
+
+        <!-- Touch Icon Arrow -->
+        <div class="w-6 h-6 rounded-full bg-champagne-500 text-slate-950 flex items-center justify-center text-xs font-black shrink-0">
+          <i class="fa-solid fa-arrow-right"></i>
+        </div>
+      </div>
+
+      <!-- Stable 3-Second Caption Indicator -->
+      <div id="bubble-hint" class="hidden px-2.5 py-1 rounded-full bg-champagne-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-lg animate-bounce">
+        Toca para reservar
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JavaScript Scanner Logic -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const video = document.getElementById('webcam');
+      const canvas = document.getElementById('qr-canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      const qrBubble = document.getElementById('qr-bubble');
+      const bubbleLogo = document.getElementById('bubble-logo');
+      const bubbleBizName = document.getElementById('bubble-biz-name');
+      const bubbleHint = document.getElementById('bubble-hint');
+      const cameraError = document.getElementById('camera-error');
+      const btnRetryCamera = document.getElementById('btn-retry-camera');
+      const btnToggleCamera = document.getElementById('btn-toggle-camera');
+
+      let currentStream = null;
+      let facingMode = 'environment';
+      let detectedUrl = null;
+      let qrStableTimer = null;
+      let isScanning = true;
+
+      // 1. Start Camera Stream
+      async function startCamera() {
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+        }
+
+        try {
+          cameraError.classList.add('hidden');
+          const constraints = {
+            video: {
+              facingMode: facingMode,
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          };
+
+          currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = currentStream;
+          video.setAttribute('playsinline', true);
+          await video.play();
+
+          requestAnimationFrame(scanQRCode);
+        } catch (err) {
+          console.error('Error accessing camera:', err);
+          cameraError.classList.remove('hidden');
+        }
+      }
+
+      // 2. Toggle Camera Front/Back
+      if (btnToggleCamera) {
+        btnToggleCamera.addEventListener('click', () => {
+          facingMode = facingMode === 'environment' ? 'user' : 'environment';
+          startCamera();
+        });
+      }
+
+      if (btnRetryCamera) {
+        btnRetryCamera.addEventListener('click', startCamera);
+      }
+
+      // 3. Main Scanning Loop with jsQR
+      function scanQRCode() {
+        if (!isScanning) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+
+          if (code && code.data) {
+            handleQRDetected(code);
+          } else {
+            hideBubble();
+          }
+        }
+
+        requestAnimationFrame(scanQRCode);
+      }
+
+      // 4. Handle QR Detection & Position Lens Pill Bubble
+      function handleQRDetected(code) {
+        const rawUrl = code.data.trim();
+
+        // Verify that the QR URL belongs to ver.html / LAUNCIT
+        if (rawUrl.includes('ver.html') || rawUrl.includes('LAUNCIT')) {
+          detectedUrl = rawUrl;
+
+          // Parse params from QR URL
+          let urlObj;
+          try {
+            urlObj = new URL(rawUrl);
+          } catch {
+            urlObj = new URL(rawUrl, window.location.origin);
+          }
+
+          const params = urlObj.searchParams;
+          const bizName = params.get('negocio') || params.get('venue') || params.get('nombre') || 'Negocio LAUNCIT';
+          const logoParam = params.get('logo') || params.get('image');
+          const planParam = (params.get('plan') || 'pro').toLowerCase();
+
+          // Update Business Name in Bubble
+          bubbleBizName.textContent = decodeURIComponent(bizName);
+
+          // Update Logo:
+          // Rule 10: "En Planes SaaS, agrega al plan PRO: Burbuja con logo animado... Los demás planes no la incluyen, y en ellos muestra logo.png de Launcit."
+          if ((planParam === 'pro' || planParam === 'elite') && logoParam) {
+            bubbleLogo.src = logoParam;
+          } else if ((planParam === 'pro' || planParam === 'elite') && !logoParam) {
+            bubbleLogo.src = './logo.png';
+          } else {
+            // Plan básico or missing: show Launcit logo.png
+            bubbleLogo.src = './logo.png';
+          }
+
+          bubbleLogo.onerror = () => {
+            bubbleLogo.src = './logo.png';
+          };
+
+          // Calculate center coordinates of QR box
+          const loc = code.location;
+          const qrCenterX = (loc.topLeftCorner.x + loc.topRightCorner.x + loc.bottomRightCorner.x + loc.bottomLeftCorner.x) / 4;
+          const qrCenterY = (loc.topLeftCorner.y + loc.topRightCorner.y + loc.bottomRightCorner.y + loc.bottomLeftCorner.y) / 4;
+
+          // Map canvas coordinates to screen dimensions
+          const videoWidth = video.videoWidth;
+          const videoHeight = video.videoHeight;
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+
+          // Calculate scale for object-fit: cover
+          const scale = Math.max(windowWidth / videoWidth, windowHeight / videoHeight);
+          const offsetX = (windowWidth - videoWidth * scale) / 2;
+          const offsetY = (windowHeight - videoHeight * scale) / 2;
+
+          const screenX = qrCenterX * scale + offsetX;
+          const screenY = qrCenterY * scale + offsetY - 40; // position slightly above QR center
+
+          // Position bubble
+          qrBubble.style.left = `${screenX}px`;
+          qrBubble.style.top = `${screenY}px`;
+          qrBubble.classList.remove('hidden');
+
+          // Start 3-second stability timer to show "Toca para reservar" caption
+          if (!qrStableTimer) {
+            qrStableTimer = setTimeout(() => {
+              if (bubbleHint) bubbleHint.classList.remove('hidden');
+            }, 3000);
+          }
+
+        } else {
+          hideBubble();
+        }
+      }
+
+      function hideBubble() {
+        qrBubble.classList.add('hidden');
+        if (bubbleHint) bubbleHint.classList.add('hidden');
+        if (qrStableTimer) {
+          clearTimeout(qrStableTimer);
+          qrStableTimer = null;
+        }
+        detectedUrl = null;
+      }
+
+      // 5. Open URL when user touches/clicks the Lens Bubble
+      qrBubble.addEventListener('click', () => {
+        if (detectedUrl) {
+          // Open URL in the same tab
+          window.location.href = detectedUrl;
+        }
+      });
+
+      // Start Camera on Page Load
+      startCamera();
+    });
+  </script>
+</body>
+</html>

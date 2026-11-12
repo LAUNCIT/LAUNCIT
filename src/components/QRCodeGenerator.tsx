@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Copy, ExternalLink, Check, Eye, Sparkles } from 'lucide-react';
+import { Download, Copy, ExternalLink, Check, Eye, Sparkles, Camera } from 'lucide-react';
 import { Venue } from '../types';
 
 export interface QRCodeGeneratorProps {
@@ -235,7 +235,17 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
             className="px-3 py-1.5 rounded-xl border border-white/10 hover:border-champagne-500/50 bg-white/5 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
           >
             <Eye className="w-3.5 h-3.5 text-champagne-400" />
-            <span>Ver Cliente (AR)</span>
+            <span>VER CLIENTE</span>
+          </a>
+
+          <a
+            href={`./escanear.html?negocio=${encodeURIComponent(venue.name)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-xl border border-champagne-500/40 bg-champagne-500/10 text-champagne-400 hover:bg-champagne-500/20 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-champagne-500/10"
+          >
+            <Camera className="w-3.5 h-3.5 text-champagne-400" />
+            <span>Probar escáner LAUNCIT</span>
           </a>
         </div>
       </div>
