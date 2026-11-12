@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { KeyRound, Lock, ShieldCheck, X } from 'lucide-react';
 
-import { auth, googleAuthProvider } from '../lib/firebase.ts';
+import { auth, googleProvider } from '../firebase';
 import { signInWithPopup } from 'firebase/auth';
 
 interface BusinessAuthModalProps {
@@ -26,7 +26,7 @@ export const BusinessAuthModal: React.FC<BusinessAuthModalProps> = ({
     try {
       setLoadingGoogle(true);
       setError('');
-      const result = await signInWithPopup(auth, googleAuthProvider);
+      const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       const token = await user.getIdToken();
 
