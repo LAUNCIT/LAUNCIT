@@ -9,6 +9,7 @@ import {
   BlockedSlot,
   DayName,
   Professional,
+  PushConfig,
   Review,
   ServiceCategory,
   ServiceItem,
@@ -857,6 +858,15 @@ export const DEFAULT_SMS_CONFIG: SmsConfig = {
   reminder2hEnabled: true,
   reminder24hEnabled: true,
   smsTemplate: `Launcit: {{cliente_nombre}}, recordatorio de reserva #{{codigo}} para {{servicio}} en {{establecimiento}} el {{fecha}} a las {{hora}}. Tu tiempo, tu reserva, tu lugar.`,
+};
+
+export const DEFAULT_PUSH_CONFIG: PushConfig = {
+  enabled: true,
+  vapidPublicKey: 'BLauncit_VAPID_Live_Key_9831724589a71b2d',
+  autoSendOnConfirm: true,
+  reminderTiming: '24h',
+  pushTitleTemplate: '¡Reserva Confirmada en {{establecimiento}}!',
+  pushBodyTemplate: 'Hola {{cliente_nombre}}, tu cita para {{servicio}} quedó agendada el {{fecha}} a las {{hora}}. ¡Te esperamos!',
 };
 
 export const INITIAL_REVIEWS: Review[] = [

@@ -16,6 +16,7 @@ export const OFFLINE_STORAGE_KEYS = {
   APPOINTMENTS: 'launcit_appointments',
   WHATSAPP_CONFIG: 'launcit_whatsapp_config',
   SMS_CONFIG: 'launcit_sms_config',
+  PUSH_CONFIG: 'launcit_push_config',
   REVIEWS: 'launcit_reviews',
   QUEUE: 'launcit_offline_queue',
 } as const;

@@ -22,6 +22,15 @@ export interface WhatsAppConfig {
   reminder24hTemplate: string;
 }
 
+export interface PushConfig {
+  enabled: boolean;
+  vapidPublicKey: string;
+  autoSendOnConfirm: boolean;
+  reminderTiming: '1h' | '2h' | '24h';
+  pushTitleTemplate: string;
+  pushBodyTemplate: string;
+}
+
 export interface SmsConfig {
   enabled: boolean;
   gatewayProvider: 'twilio' | 'aws_sns' | 'simulated';

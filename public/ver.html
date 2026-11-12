@@ -159,20 +159,30 @@
     <div id="welcome-card" class="relative z-10 flex flex-col items-center max-w-xs sm:max-w-sm w-full transition-transform duration-100 ease-out" style="perspective: 800px; transform-style: preserve-3d;">
       
       <!-- Hologram Wrapper with Entry, Float, and Shimmer -->
-      <div id="logo-container" class="relative mb-6 hologram-wrapper">
+      <div id="logo-container" class="relative mb-6 hologram-wrapper flex flex-col items-center justify-center">
+        <!-- Holographic Floor Rings (Anillos holográficos debajo del logo, posición absoluta dentro del contenedor) -->
+        <div class="absolute -bottom-4 w-52 h-16 rounded-full border border-champagne-500/40 opacity-70 animate-ping pointer-events-none" style="transform: rotateX(70deg);"></div>
+        <div class="absolute -bottom-4 w-36 h-12 rounded-full border-2 border-champagne-400/60 opacity-80 animate-pulse pointer-events-none" style="transform: rotateX(70deg);"></div>
+
         <!-- Parallax Background Halo -->
         <div class="absolute -inset-6 bg-gradient-to-r from-champagne-500/45 via-amber-400/55 to-champagne-600/45 rounded-full blur-2xl animate-pulse pointer-events-none"></div>
         
         <!-- Floor Shadow (Sombra en el piso) -->
         <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 w-32 h-6 bg-champagne-500/30 rounded-full blur-md floor-shadow"></div>
 
-        {/* Fake 3D Thickness Layers (Grosor falso: 4 copias apiladas) */}
-        <div class="absolute inset-0 translate-z-1 opacity-25 rounded-2xl bg-champagne-600/30 blur-xs"></div>
-        <div class="absolute inset-0 translate-z-3 opacity-20 rounded-2xl bg-champagne-500/25 blur-xs"></div>
-        <div class="absolute inset-0 translate-z-5 opacity-15 rounded-2xl bg-amber-400/20 blur-xs"></div>
+        <!-- False 3D Thickness Layers (Grosor falso: copias apiladas detrás del logo con brightness 0.5 y sepia dorado) -->
+        <div class="absolute inset-0 max-w-[220px] w-36 h-36 mx-auto pointer-events-none" style="transform: translateZ(1px); filter: brightness(0.5) sepia(100%) hue-rotate(10deg); opacity: 0.6;">
+          <img src="./logo.png" alt="" class="w-full h-full object-contain block mx-auto" />
+        </div>
+        <div class="absolute inset-0 max-w-[220px] w-36 h-36 mx-auto pointer-events-none" style="transform: translateZ(3px); filter: brightness(0.4) sepia(100%) hue-rotate(10deg); opacity: 0.4;">
+          <img src="./logo.png" alt="" class="w-full h-full object-contain block mx-auto" />
+        </div>
+        <div class="absolute inset-0 max-w-[220px] w-36 h-36 mx-auto pointer-events-none" style="transform: translateZ(5px); filter: brightness(0.3) sepia(100%) hue-rotate(10deg); opacity: 0.25;">
+          <img src="./logo.png" alt="" class="w-full h-full object-contain block mx-auto" />
+        </div>
 
-        <!-- Business Logo Image (with Shimmer Sweep & Transparency check) -->
-        <div class="relative overflow-hidden rounded-3xl border-2 border-champagne-500/60 shadow-2xl shadow-champagne-500/40 bg-obsidian-900/90 p-3 hologram-logo-box">
+        <!-- Business Logo Image (Libre, sin fondo oscuro ni borde ancho, max-width 220px, centrado) -->
+        <div class="relative overflow-hidden max-w-[220px] w-36 h-36 mx-auto flex items-center justify-center p-1">
           <!-- Shimmer Sweep Bar (Brillo barrido) -->
           <div class="absolute inset-0 shimmer-sweep pointer-events-none"></div>
 
@@ -180,7 +190,7 @@
             id="welcome-logo"
             src="./logo.png"
             alt="Logo del negocio"
-            class="relative w-28 h-28 sm:w-36 sm:h-36 object-contain block mx-auto"
+            class="relative w-full h-full object-contain block mx-auto"
           />
         </div>
       </div>

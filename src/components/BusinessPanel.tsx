@@ -2295,6 +2295,9 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                       Recomendado: PNG con fondo transparente, cuadrado, mínimo 512x512 px. Máximo 2 MB; si es mayor, se redimensiona automáticamente.
                     </p>
+                    <p className="text-[11px] text-champagne-400 font-medium italic">
+                      Sube un PNG con fondo transparente para mejor efecto en realidad aumentada.
+                    </p>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <input

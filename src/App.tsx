@@ -46,6 +46,7 @@ import {
   ClientSubView,
   DayName,
   Professional,
+  PushConfig,
   Review,
   SaasPlanId,
   ServiceItem,
@@ -56,6 +57,7 @@ import {
 } from './types';
 import {
   BRAND_LOGO_FALLBACK,
+  DEFAULT_PUSH_CONFIG,
   DEFAULT_SMS_CONFIG,
   DEFAULT_WHATSAPP_CONFIG,
   INITIAL_APPOINTMENTS,
@@ -130,6 +132,9 @@ export default function App() {
   const [smsConfig, setSmsConfig] = useState<SmsConfig>(() =>
     loadFromStorage(OFFLINE_STORAGE_KEYS.SMS_CONFIG, DEFAULT_SMS_CONFIG)
   );
+  const [pushConfig, setPushConfig] = useState<PushConfig>(() =>
+    loadFromStorage(OFFLINE_STORAGE_KEYS.PUSH_CONFIG, DEFAULT_PUSH_CONFIG)
+  );
   const [reviews, setReviews] = useState<Review[]>(() =>
     loadFromStorage(OFFLINE_STORAGE_KEYS.REVIEWS, INITIAL_REVIEWS)
   );
@@ -187,6 +192,10 @@ export default function App() {
   useEffect(() => {
     saveToStorage(OFFLINE_STORAGE_KEYS.SMS_CONFIG, smsConfig);
   }, [smsConfig]);
+
+  useEffect(() => {
+    saveToStorage(OFFLINE_STORAGE_KEYS.PUSH_CONFIG, pushConfig);
+  }, [pushConfig]);
 
   useEffect(() => {
     saveToStorage(OFFLINE_STORAGE_KEYS.REVIEWS, reviews);
