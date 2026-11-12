@@ -69,14 +69,18 @@ import {
   INITIAL_WORKING_DAYS,
 } from './data/initialData';
 import { formatCOP } from './utils/scheduleUtils';
+import { useAuth } from './context/AuthContext';
+import { signOut } from 'firebase/auth';
+import { auth } from './firebase';
 import { ResilientImage } from './components/ResilientImage';
 import { ClientWorld } from './components/ClientWorld';
 import { BusinessPanel } from './components/BusinessPanel';
 import { BookingWizardModal } from './components/BookingWizardModal';
-import { BusinessAuthModal } from './components/BusinessAuthModal';
+import { AuthScreen } from './components/AuthScreen';
 import { SmartQRSplashModal } from './components/SmartQRSplashModal';
 
 export default function App() {
+  const { user } = useAuth();
   // Two independent roles: 'client' (default, zero-registration) | 'business' (protected partner admin)
   const [role, setRole] = useState<AppRole>('client');
   const [isBusinessAuthenticated, setIsBusinessAuthenticated] = useState(false);
@@ -473,7 +477,8 @@ export default function App() {
     showToast('Regresaste a la Vista de Cliente (navegación libre).');
   };
 
-  const handleLogoutBusiness = () => {
+  const handleLogoutBusiness = async () => {
+    await signOut(auth);
     setIsBusinessAuthenticated(false);
     setAuthToken(null);
     setMobileMenuOpen(false);
@@ -1178,7 +1183,7 @@ export default function App() {
                   onShowToast={showToast}
                 />
               </motion.div>
-            ) : (
+            ) : role === 'business' && user ? (
               <motion.div
                 key={`business-${businessView}`}
                 initial={{ opacity: 0, y: 6 }}
@@ -1217,6 +1222,16 @@ export default function App() {
                   onTestQrSplash={(v) => setQrSplashVenue(v)}
                   onShowToast={showToast}
                 />
+              </motion.div>
+            ) : null}
+            {role === 'business' && !user && (
+              <motion.div
+                key="auth"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <AuthScreen onAuthenticated={() => {}} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1267,11 +1282,7 @@ export default function App() {
       {/* ======================================================== */}
       {/* PROTECTED PARTNER ACCESS MODAL                           */}
       {/* ======================================================== */}
-      <BusinessAuthModal
-        isOpen={isBusinessAuthOpen}
-        onClose={() => setIsBusinessAuthOpen(false)}
-        onAuthenticated={handleBusinessAuthenticated}
-      />
+
 
       {/* ======================================================== */}
       {/* MOBILE BOTTOM NAVIGATION (Client Only)                   */}
