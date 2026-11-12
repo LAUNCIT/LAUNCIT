@@ -81,11 +81,22 @@ import { ProfileDropdown } from './components/ProfileDropdown';
 import { SmartQRSplashModal } from './components/SmartQRSplashModal';
 
 export default function App() {
-  const { user } = useAuth();
-  // Two independent roles: 'client' (default, zero-registration) | 'business' (protected partner admin)
+  const { user, loading } = useAuth();
+  
+  type NavigationView = 'inicio' | 'login' | 'completar-negocio' | 'panel';
+  const [view, setView] = useState<NavigationView>('inicio');
   const [role, setRole] = useState<AppRole>('client');
-  const [isBusinessAuthenticated, setIsBusinessAuthenticated] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('admin@launcit.com');
+
+  const navigateTo = (newView: NavigationView) => {
+    if (view === 'panel' && newView !== 'panel') {
+      if (!window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
+    }
+    setView(newView);
+    if (newView === 'panel' || newView === 'completar-negocio') setRole('business');
+    else setRole('client');
+    setMobileMenuOpen(false);
+  };
 
   // Navigation within each world
   const [clientView, setClientView] = useState<ClientSubView>('explore');
@@ -104,12 +115,10 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Modals State
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [bookingInitialVenue, setBookingInitialVenue] = useState<Venue | null>(
     null
   );
-  const [isBusinessAuthOpen, setIsBusinessAuthOpen] = useState(false);
 
   // Shared Synchronized Platform State (Hydrated from localStorage for offline continuity)
   const [venues, setVenues] = useState<Venue[]>(() =>
@@ -452,29 +461,21 @@ export default function App() {
   }, [venues]);
 
   const goToHome = () => {
-    if (businessView !== 'dashboard') {
+    if (view === 'panel' && businessView !== 'dashboard') {
       if (!window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
     }
-    setRole('client');
-    setClientView('explore');
-    setMobileMenuOpen(false);
+    navigateTo('inicio');
   };
 
   const handleRequestBusinessAccess = () => {
-    setMobileMenuOpen(false);
-    if (!user) {
-      setIsBusinessAuthOpen(true);
-      return;
-    }
-    // Simulate check for business
-    setRole('business');
-    setBusinessView('dashboard');
+    if (!user) navigateTo('login');
+    else if (venues.length === 0) navigateTo('completar-negocio');
+    else navigateTo('panel');
   };
 
   const handleLogoutBusiness = async () => {
     await signOut(auth);
-    setRole('client');
-    setClientView('explore');
+    navigateTo('inicio');
     showToast('Sesión cerrada.');
   };
 
@@ -982,7 +983,7 @@ export default function App() {
                 ) : (
                   <>
                     <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Cliente Invitado</p>
-                    <button onClick={() => setIsBusinessAuthOpen(true)} className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium truncate hover:underline">Iniciar sesión</button>
+                    <button onClick={() => navigateTo('login')} className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium truncate hover:underline">Iniciar sesión</button>
                   </>
                 )}
               </div>
@@ -1081,7 +1082,7 @@ export default function App() {
             {user ? (
               <ProfileDropdown onGoToPanel={handleRequestBusinessAccess} onLogout={handleLogoutBusiness} />
             ) : (
-              <button onClick={() => setIsBusinessAuthOpen(true)} className="text-xs font-bold text-slate-600 dark:text-slate-400">Acceder</button>
+              <button onClick={() => navigateTo('login')} className="text-xs font-bold text-slate-600 dark:text-slate-400">Acceder</button>
             )}
 
             <button
@@ -1120,82 +1121,75 @@ export default function App() {
 
         {/* Main Workspace Viewport (Compact padding) */}
         <main className="flex-1 p-3 sm:p-8 max-w-7xl w-full mx-auto">
-          <AnimatePresence mode="wait">
-            {role === 'client' ? (
-              <motion.div
-                key={`client-${clientView}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <ClientWorld
-                  activeView={clientView}
-                  venues={venues}
-                  services={services}
-                  appointments={appointments}
-                  reviews={reviews}
-                  lookupPhone={lookupPhone}
-                  whatsAppConfig={whatsAppConfig}
-                  onLookupPhoneChange={setLookupPhone}
-                  onOpenBooking={(v) => handleOpenBooking(v)}
-                  onCancelAppointment={handleCancelAppointment}
-                  onAddReview={handleAddReview}
-                  onShowToast={showToast}
-                />
-              </motion.div>
-            ) : role === 'business' && user ? (
-              <motion.div
-                key={`business-${businessView}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <BusinessPanel
-                  activeView={businessView}
-                  partnerEmail={partnerEmail}
-                  venues={venues}
-                  onUpdateVenue={handleUpdateVenue}
-                  services={services}
-                  professionals={professionals}
-                  workingDays={workingDays}
-                  blockedSlots={blockedSlots}
-                  appointments={appointments}
-                  reviews={reviews}
-                  activePlan={activePlan}
-                  whatsAppConfig={whatsAppConfig}
-                  onSaveWhatsAppConfig={handleSaveWhatsAppConfig}
-                  smsConfig={smsConfig}
-                  onSaveSmsConfig={handleSaveSmsConfig}
-                  onChangeView={setBusinessView}
-                  onSaveService={handleSaveService}
-                  onToggleServiceActive={handleToggleServiceActive}
-                  onDeleteService={handleDeleteService}
-                  onSaveProfessional={handleSaveProfessional}
-                  onDeleteProfessional={handleDeleteProfessional}
-                  onToggleWorkingDay={handleToggleWorkingDay}
-                  onUpdateWorkingHours={handleUpdateWorkingHours}
-                  onAddBlockedSlot={handleAddBlockedSlot}
-                  onRemoveBlockedSlot={handleRemoveBlockedSlot}
-                  onUpdateAppointmentStatus={handleUpdateAppointmentStatus}
-                  onSelectPlan={handleSelectPlan}
-                  onTestQrSplash={(v) => setQrSplashVenue(v)}
-                  onShowToast={showToast}
-                />
-              </motion.div>
-            ) : null}
-            {role === 'business' && !user && (
-              <motion.div
-                key="auth"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <AuthScreen onAuthenticated={() => {}} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {loading ? (
+            <div className="flex items-center justify-center h-full">Cargando...</div>
+          ) : (
+            <AnimatePresence mode="wait">
+              {view === 'inicio' && (
+                <motion.div key="inicio" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <ClientWorld
+                    activeView={clientView}
+                    venues={venues}
+                    services={services}
+                    appointments={appointments}
+                    reviews={reviews}
+                    lookupPhone={lookupPhone}
+                    whatsAppConfig={whatsAppConfig}
+                    onLookupPhoneChange={setLookupPhone}
+                    onOpenBooking={(v) => handleOpenBooking(v)}
+                    onCancelAppointment={handleCancelAppointment}
+                    onAddReview={handleAddReview}
+                    onShowToast={showToast}
+                  />
+                </motion.div>
+              )}
+              {view === 'panel' && user && (
+                <motion.div key="panel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <BusinessPanel
+                    activeView={businessView}
+                    partnerEmail={user.email || 'socio@launcit.com'}
+                    venues={venues}
+                    onUpdateVenue={handleUpdateVenue}
+                    services={services}
+                    professionals={professionals}
+                    workingDays={workingDays}
+                    blockedSlots={blockedSlots}
+                    appointments={appointments}
+                    reviews={reviews}
+                    activePlan={activePlan}
+                    whatsAppConfig={whatsAppConfig}
+                    onSaveWhatsAppConfig={handleSaveWhatsAppConfig}
+                    smsConfig={smsConfig}
+                    onSaveSmsConfig={handleSaveSmsConfig}
+                    onChangeView={setBusinessView}
+                    onSaveService={handleSaveService}
+                    onToggleServiceActive={handleToggleServiceActive}
+                    onDeleteService={handleDeleteService}
+                    onSaveProfessional={handleSaveProfessional}
+                    onDeleteProfessional={handleDeleteProfessional}
+                    onToggleWorkingDay={handleToggleWorkingDay}
+                    onUpdateWorkingHours={handleUpdateWorkingHours}
+                    onAddBlockedSlot={handleAddBlockedSlot}
+                    onRemoveBlockedSlot={handleRemoveBlockedSlot}
+                    onUpdateAppointmentStatus={handleUpdateAppointmentStatus}
+                    onSelectPlan={handleSelectPlan}
+                    onTestQrSplash={(v) => setQrSplashVenue(v)}
+                    onShowToast={showToast}
+                  />
+                </motion.div>
+              )}
+              {view === 'login' && (
+                <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <AuthScreen onAuthenticated={() => navigateTo('panel')} />
+                </motion.div>
+              )}
+              {view === 'completar-negocio' && (
+                <motion.div key="completar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <div className="flex items-center justify-center h-full">Completa tu negocio...</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </main>
       </div>
 
