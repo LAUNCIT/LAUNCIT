@@ -74,6 +74,7 @@ export interface Venue {
   location: string;
   priceLevel: string;
   image: string;
+  logo?: string;
   glbUrl?: string;
   photos?: string[];
   description?: string;

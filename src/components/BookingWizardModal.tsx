@@ -93,19 +93,21 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 overflow-hidden" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden" role="dialog" aria-modal="true">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white dark:bg-obsidian-900 w-full max-w-xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-[32px] border border-sand-200 dark:border-obsidian-800 shadow-2xl overflow-hidden flex flex-col relative"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-obsidian-900 w-full sm:max-w-[560px] h-[92dvh] sm:h-auto sm:max-h-[90dvh] rounded-t-3xl sm:rounded-[32px] border border-sand-200 dark:border-obsidian-800 shadow-2xl overflow-hidden flex flex-col relative"
       >
-        {/* Header (Minimal) */}
+        {/* Close Button X (Positioned independently without overlapping text) */}
         {!confirmedAppt && (
-          <div className="absolute top-4 right-4 z-20">
-            <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 dark:bg-obsidian-800/50 backdrop-blur-md flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all border border-sand-200 dark:border-obsidian-750 glow-up">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button 
+            onClick={onClose} 
+            className="absolute top-3.5 right-3.5 z-30 w-9 h-9 rounded-full bg-sand-100/80 dark:bg-obsidian-800/80 backdrop-blur-md flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all border border-sand-200 dark:border-obsidian-750 active:scale-95"
+            aria-label="Cerrar modal"
+          >
+            <X className="w-4 h-4" />
+          </button>
         )}
 
         {confirmedAppt ? (

@@ -23,9 +23,17 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
 
   // Automatically generate the unique URL for ver.html respecting repository subpaths (e.g. GitHub Pages /LAUNCIT/)
   const getFullArUrl = () => {
-    if (typeof window === 'undefined') return `./ver.html?negocio=${encodeURIComponent(venue.name)}`;
+    let base = `./ver.html?negocio=${encodeURIComponent(venue.name)}`;
+    if (venue.logo) {
+      base += `&logo=${encodeURIComponent(venue.logo)}`;
+    }
+    if (typeof window === 'undefined') return base;
     const pathname = window.location.pathname.replace(/\/index\.html$/i, '').replace(/\/$/, '');
-    return `${window.location.origin}${pathname}/ver.html?negocio=${encodeURIComponent(venue.name)}`;
+    let url = `${window.location.origin}${pathname}/ver.html?negocio=${encodeURIComponent(venue.name)}`;
+    if (venue.logo) {
+      url += `&logo=${encodeURIComponent(venue.logo)}`;
+    }
+    return url;
   };
   const arUrl = getFullArUrl();
 
@@ -191,7 +199,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
                 level="H"
                 includeMargin={false}
                 imageSettings={{
-                  src: './logo.png',
+                  src: venue.logo || './logo.png',
                   x: undefined,
                   y: undefined,
                   height: 28,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Appointment, Venue, ServiceItem, Professional, DayName, WorkingDayConfig, BlockedSlot } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, ArrowRight, Calendar, Check, CheckCircle2, Clock, Copy, ExternalLink, Lock, MessageCircle, ShieldCheck, Users, X, CalendarCheck2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, CalendarCheck2, Clock, Users, UserCheck } from 'lucide-react';
 import { formatCOP } from '../../utils/scheduleUtils';
 import { UPCOMING_DATES, TIME_SLOTS, SPECIALIST_AVATAR_FALLBACK } from '../../data/initialData';
 import { evaluateSlotAvailability } from '../../utils/scheduleUtils';
@@ -76,53 +76,51 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 py-3 border-b border-sand-200 dark:border-obsidian-800 bg-white/50 dark:bg-obsidian-900/50 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex justify-between items-center mb-2">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Fixed Header */}
+      <div className="px-5 sm:px-6 py-3.5 border-b border-sand-200 dark:border-obsidian-800 bg-white/95 dark:bg-obsidian-900/95 backdrop-blur-md shrink-0 pr-14 relative z-10">
+        <div className="flex justify-between items-center mb-1.5">
           <span className="text-[10px] font-bold text-champagne-600 uppercase tracking-widest">Paso {step} de 4</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{venue.subCategory}</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[150px]">{venue.name}</span>
         </div>
         <div className="h-1 bg-sand-200 dark:bg-obsidian-800 rounded-full overflow-hidden">
-          <motion.div 
-            className="h-full bg-champagne-500" 
-            initial={{ width: 0 }}
-            animate={{ width: `${(step / 4) * 100}%` }}
-          />
+          <motion.div className="h-full bg-champagne-500" initial={{ width: 0 }} animate={{ width: `${(step / 4) * 100}%` }} />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24 sm:pb-32">
+      {/* Scrollable Body */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 pb-12 sm:pb-16 min-h-0">
         <AnimatePresence mode="wait">
           {step === 1 && (
-            <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Selecciona el servicio</h3>
-              <div className="grid gap-3">
+            <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
+              <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">Selecciona el servicio</h3>
+              <div className="grid gap-2.5">
                 {activeServices.map(s => (
                   <button
                     key={s.id}
                     onClick={() => setSelectedService(s)}
-                    className={`p-4 rounded-2xl border text-left transition-all glow-up ${selectedService?.id === s.id ? 'border-champagne-500 bg-champagne-500/10' : 'border-sand-200 dark:border-obsidian-800 hover:border-champagne-500/50'}`}
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${selectedService?.id === s.id ? 'border-champagne-500 bg-champagne-500/10' : 'border-sand-200 dark:border-obsidian-800 hover:border-champagne-500/50'}`}
                   >
-                    <div className="flex justify-between items-start gap-4">
+                    <div className="flex justify-between items-start gap-3">
                       <div className="min-w-0">
-                        <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{s.name}</p>
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-1">{s.desc}</p>
-                        <p className="text-[10px] font-mono text-champagne-600 mt-2 bg-champagne-500/5 px-2 py-1 rounded-full w-fit">{s.duration}</p>
+                        <p className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">{s.name}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{s.desc}</p>
+                        <p className="text-[10px] font-mono text-champagne-600 mt-1.5 bg-champagne-500/5 px-2 py-0.5 rounded-full w-fit">{s.duration}</p>
                       </div>
-                      <span className="font-bold text-sm text-slate-900 dark:text-white shrink-0">{formatCOP(s.price)}</span>
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white shrink-0">{formatCOP(s.price)}</span>
                     </div>
                   </button>
                 ))}
               </div>
 
               {venue.subCategory === 'Peluquería' && selectedService && (
-                <div className="p-4 rounded-2xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-800 space-y-3">
+                <div className="p-3.5 rounded-2xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-800 space-y-2">
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Detalles de tu cabello:</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <select 
                       value={hairLength} 
                       onChange={e => setHairLength(e.target.value)}
-                      className="bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 rounded-xl p-3 text-xs"
+                      className="bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white"
                     >
                       <option value="">Largo del cabello</option>
                       <option value="Corto">Corto</option>
@@ -132,7 +130,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
                     <select 
                       value={hairType} 
                       onChange={e => setHairType(e.target.value)}
-                      className="bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 rounded-xl p-3 text-xs"
+                      className="bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white"
                     >
                       <option value="">Tipo de cabello</option>
                       <option value="Liso">Liso</option>
@@ -146,30 +144,29 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
           )}
 
           {step === 2 && (
-            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">¿Con quién prefieres reservar?</h3>
-              <div className="grid grid-cols-2 gap-3">
+            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
+              <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">¿Con quién prefieres reservar?</h3>
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   onClick={() => setSelectedPro('any')}
-                  className={`p-4 rounded-2xl border text-center transition-all glow-up ${selectedPro === 'any' ? 'border-champagne-500 bg-champagne-500/10' : 'border-sand-200 dark:border-obsidian-800 hover:border-champagne-500/50'}`}
+                  className={`p-3.5 rounded-2xl border text-center transition-all ${selectedPro === 'any' ? 'border-champagne-500 bg-champagne-500/10' : 'border-sand-200 dark:border-obsidian-800 hover:border-champagne-500/50'}`}
                 >
-                  <div className="w-12 h-12 bg-champagne-500/20 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner shadow-black/5">
-                    <Users className="w-6 h-6 text-champagne-600" />
+                  <div className="w-10 h-10 bg-champagne-500/20 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                    <Users className="w-5 h-5 text-champagne-600" />
                   </div>
-                  <p className="font-bold text-xs text-slate-900 dark:text-white">Cualquier profesional</p>
+                  <p className="font-bold text-xs text-slate-900 dark:text-white">Primer disponible</p>
                 </button>
                 {availablePros.map(p => (
                   <button
                     key={p.id}
                     onClick={() => setSelectedPro(p)}
-                    className={`p-3 rounded-2xl border text-center transition-all glow-up ${selectedPro !== 'any' && selectedPro?.id === p.id ? 'border-champagne-500 bg-champagne-500/10' : 'border-sand-200 dark:border-obsidian-800 hover:border-champagne-500/50'}`}
+                    className={`p-3 rounded-2xl border text-center transition-all ${selectedPro !== 'any' && selectedPro?.id === p.id ? 'border-champagne-500 bg-champagne-500/10' : 'border-sand-200 dark:border-obsidian-800 hover:border-champagne-500/50'}`}
                   >
-                    <div className="w-12 h-12 rounded-full overflow-hidden mx-auto mb-2 border-2 border-champagne-500/20 shadow-md">
+                    <div className="w-10 h-10 rounded-full overflow-hidden mx-auto mb-1.5 border-2 border-champagne-500/20 shadow-sm">
                       <ResilientImage src={p.avatar} alt={p.name} fallbackSrc={SPECIALIST_AVATAR_FALLBACK} />
                     </div>
                     <p className="font-bold text-xs truncate text-slate-900 dark:text-white">{p.name}</p>
                     <p className="text-[10px] text-slate-500 truncate">{p.role}</p>
-                    <p className="text-[10px] font-bold text-champagne-600 mt-1">★ {p.rating}</p>
                   </button>
                 ))}
               </div>
@@ -177,9 +174,9 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
           )}
 
           {step === 3 && (
-            <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-              <div className="space-y-3">
-                <h3 className="font-bold text-lg text-slate-900 dark:text-white">Selecciona la fecha</h3>
+            <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">Selecciona la fecha</h3>
                 <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
                   {UPCOMING_DATES.map(d => {
                     const isOpen = workingDays?.[d.dayName]?.isOpen ?? true;
@@ -188,10 +185,10 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
                         key={d.dateKey}
                         disabled={!isOpen}
                         onClick={() => { setSelectedDate(d.dateKey); setSelectedDayName(d.dayName); }}
-                        className={`flex-shrink-0 w-16 p-3 rounded-2xl border flex flex-col items-center gap-1 transition-all glow-up ${!isOpen ? 'opacity-30 cursor-not-allowed bg-sand-100' : selectedDate === d.dateKey ? 'border-champagne-500 bg-champagne-500 text-slate-950 font-bold shadow-lg shadow-champagne-500/20' : 'border-sand-200 dark:border-obsidian-800 bg-white dark:bg-obsidian-900'}`}
+                        className={`flex-shrink-0 w-16 p-3 rounded-2xl border flex flex-col items-center gap-0.5 transition-all ${!isOpen ? 'opacity-30 cursor-not-allowed bg-sand-100' : selectedDate === d.dateKey ? 'border-champagne-500 bg-champagne-500 text-slate-950 font-bold shadow-md' : 'border-sand-200 dark:border-obsidian-800 bg-white dark:bg-obsidian-900'}`}
                       >
-                        <span className="text-[10px] uppercase opacity-70">{d.shortDay}</span>
-                        <span className="text-sm font-black">{d.shortDate.split(' ')[0]}</span>
+                        <span className="text-[10px] uppercase font-bold opacity-60">{d.shortDay}</span>
+                        <span className="text-base font-black">{d.shortDate.split(' ')[0]}</span>
                       </button>
                     );
                   })}
@@ -199,8 +196,8 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
               </div>
 
               {selectedDate && (
-                <div className="space-y-3">
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Horarios disponibles</h3>
+                <div className="space-y-2">
+                  <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider ml-1">Horarios disponibles</h3>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {TIME_SLOTS.map(t => {
                       const availability = evaluateSlotAvailability({
@@ -212,7 +209,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
                           key={t}
                           disabled={!availability.available}
                           onClick={() => setSelectedTime(t)}
-                          className={`p-2.5 rounded-xl border text-[10px] font-bold transition-all glow-up ${!availability.available ? 'opacity-30 cursor-not-allowed' : selectedTime === t ? 'bg-slate-900 text-white dark:bg-champagne-500 dark:text-slate-950 shadow-md shadow-champagne-500/20' : 'border-sand-200 dark:border-obsidian-800'}`}
+                          className={`p-2.5 rounded-xl border text-xs font-bold font-mono transition-all ${!availability.available ? 'opacity-30 cursor-not-allowed' : selectedTime === t ? 'bg-slate-900 text-white dark:bg-champagne-500 dark:text-slate-950 shadow-sm' : 'border-sand-200 dark:border-obsidian-800 bg-white dark:bg-obsidian-900'}`}
                         >
                           {t}
                         </button>
@@ -225,34 +222,32 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
           )}
 
           {step === 4 && (
-            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-              <div className="p-6 rounded-3xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-800 space-y-4 shadow-inner shadow-black/5">
+            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+              {/* Compact Summary Card */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-800 space-y-2.5 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-white dark:bg-obsidian-900 flex items-center justify-center border border-sand-200 dark:border-obsidian-800 shadow-sm">
-                    <CalendarCheck2 className="w-6 h-6 text-champagne-600" />
+                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-obsidian-900 flex items-center justify-center border border-sand-200 dark:border-obsidian-800 shadow-sm shrink-0">
+                    <CalendarCheck2 className="w-5 h-5 text-champagne-600" />
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resumen de Reserva</p>
-                    <h4 className="font-bold text-slate-900 dark:text-white">{venue.name}</h4>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{venue.subCategory || 'Cita'}</p>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">{venue.name}</h4>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">{selectedService?.name}</p>
                   </div>
+                  <span className="text-sm font-black text-champagne-600 shrink-0">
+                    {formatCOP(selectedService?.price || 0)}
+                  </span>
                 </div>
 
-                <div className="space-y-3 border-t border-sand-200 dark:border-obsidian-800 pt-4">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Servicio</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{selectedService?.name}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-sand-200 dark:border-obsidian-800 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
+                    <Calendar className="w-3.5 h-3.5 text-champagne-600" />
+                    <span>{selectedDate}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white ml-1">· {selectedTime}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Profesional</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{selectedPro === 'any' ? 'Primer disponible' : selectedPro?.name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-slate-500">Cita</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{selectedDate} · {selectedTime}</span>
-                  </div>
-                  <div className="flex justify-between text-sm pt-2 border-t border-sand-200 dark:border-obsidian-800">
-                    <span className="font-bold text-slate-900 dark:text-white uppercase tracking-tighter">Total</span>
-                    <span className="font-black text-champagne-600 text-lg">{formatCOP(selectedService?.price || 0)}</span>
+                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
+                    <UserCheck className="w-3.5 h-3.5 text-champagne-600" />
+                    <span className="truncate max-w-[130px]">{selectedPro === 'any' ? 'Primer disponible' : selectedPro?.name}</span>
                   </div>
                 </div>
               </div>
@@ -263,27 +258,16 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
                 email={clientEmail} setEmail={setClientEmail}
                 notes={clientNotes} setNotes={setClientNotes}
               />
-
-              {['Odontología', 'Psicología', 'Medicina'].includes(venue.subCategory || '') && (
-                <div className="space-y-3">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest ml-1">Motivo de consulta:</label>
-                  <textarea 
-                    value={dentalReason}
-                    onChange={e => setReason(e.target.value)}
-                    placeholder="Cuéntanos brevemente el motivo..."
-                    className="w-full bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 rounded-2xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-champagne-500/20 outline-none"
-                  />
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      <div className="p-6 border-t border-sand-200 dark:border-obsidian-800 bg-sand-50/50 dark:bg-obsidian-900/50 flex justify-between items-center gap-3 sticky bottom-0 z-10 backdrop-blur-md">
+      {/* Fixed Footer */}
+      <div className="px-5 sm:px-6 py-3.5 border-t border-sand-200 dark:border-obsidian-800 bg-sand-50/95 dark:bg-obsidian-900/95 flex justify-between items-center gap-3 shrink-0 backdrop-blur-md pb-[max(1rem,env(safe-area-inset-bottom))] z-10">
         <button
           onClick={step === 1 ? onCancel : handleBack}
-          className="px-6 py-4 rounded-2xl text-xs font-bold text-slate-500 hover:bg-sand-100 dark:hover:bg-obsidian-800 transition-all flex items-center gap-2 glow-up"
+          className="px-4 py-3 rounded-2xl text-xs font-bold text-slate-500 hover:bg-sand-100 dark:hover:bg-obsidian-800 transition-all flex items-center gap-1.5 min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>{step === 1 ? 'Cancelar' : 'Anterior'}</span>
@@ -294,7 +278,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
           disabled={
             (step === 1 && !selectedService) || (step === 2 && !selectedPro) || (step === 3 && !selectedTime) || (step === 4 && (!clientName || !clientPhone))
           }
-          className="flex-1 px-6 py-4 rounded-2xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-black text-xs uppercase tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 glow-up"
+          className="flex-1 max-w-xs px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 disabled:opacity-40 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 min-h-[44px]"
         >
           <span>{step === 4 ? 'Confirmar Reserva' : 'Continuar'}</span>
           {step < 4 && <ArrowRight className="w-4 h-4" />}

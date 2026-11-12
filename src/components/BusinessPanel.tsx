@@ -2268,6 +2268,117 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                 </div>
               </form>
 
+              {/* Logo de mi negocio (PARTE A: SUBIDA DEL LOGO POR NEGOCIO) */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 space-y-4">
+                <div className="flex items-center justify-between border-b border-sand-200 dark:border-obsidian-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Store className="w-4 h-4 text-champagne-500" />
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                      Logo de mi negocio
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-champagne-400 font-bold uppercase tracking-wider">
+                    Identidad Visual
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-5 text-xs">
+                  <div className="w-24 h-24 rounded-2xl border-2 border-champagne-500/50 bg-obsidian-950 overflow-hidden flex items-center justify-center shrink-0 shadow-lg p-2">
+                    <img
+                      src={currentVenue.logo || currentVenue.image || './logo.png'}
+                      alt="Logo actual"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  <div className="space-y-3 flex-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Recomendado: PNG con fondo transparente, cuadrado, mínimo 512x512 px. Máximo 2 MB; si es mayor, se redimensiona automáticamente.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                        id="venue-logo-file-input"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !onUpdateVenue) return;
+                          
+                          // Validate max 2MB
+                          if (file.size > 2 * 1024 * 1024) {
+                            onShowToast('El archivo supera los 2 MB. Por favor elige una imagen más ligera.');
+                            return;
+                          }
+
+                          const reader = new FileReader();
+                          reader.onload = (loadEvent) => {
+                            const img = new Image();
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              canvas.width = 512;
+                              canvas.height = 512;
+                              const ctx = canvas.getContext('2d');
+                              if (ctx) {
+                                ctx.clearRect(0, 0, 512, 512);
+                                // Maintain aspect ratio & transparency
+                                let w = img.width;
+                                let h = img.height;
+                                let x = 0;
+                                let y = 0;
+                                if (w > h) {
+                                  let scaledH = (h * 512) / w;
+                                  y = (512 - scaledH) / 2;
+                                  ctx.drawImage(img, 0, y, 512, scaledH);
+                                } else {
+                                  let scaledW = (w * 512) / h;
+                                  x = (512 - scaledW) / 2;
+                                  ctx.drawImage(img, x, 0, scaledW, 512);
+                                }
+                              }
+                              const dataUrl = canvas.toDataURL('image/png');
+                              onUpdateVenue({
+                                ...currentVenue,
+                                logo: dataUrl,
+                              });
+                              onShowToast('¡Logo actualizado y redimensionado a 512x512 px con éxito!');
+                            };
+                            img.src = loadEvent.target?.result as string;
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      <label
+                        htmlFor="venue-logo-file-input"
+                        className="px-4 py-2.5 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider cursor-pointer shadow-md transition-all inline-flex items-center gap-1.5"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>Cambiar logo</span>
+                      </label>
+
+                      {currentVenue.logo && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onUpdateVenue) {
+                              onUpdateVenue({
+                                ...currentVenue,
+                                logo: undefined,
+                              });
+                            }
+                            onShowToast('Logo eliminado. Se usará el respaldo por defecto.');
+                          }}
+                          className="px-4 py-2.5 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-bold text-xs uppercase tracking-wider transition-colors"
+                        >
+                          Quitar logo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Zona de Publicación y Carga de Fotos */}
               <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sand-200 dark:border-obsidian-800 pb-3.5">
@@ -3505,6 +3616,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                     location: newBizAddress.trim() || 'Colombia',
                     priceLevel: '$$',
                     image: newBizImage || BRAND_LOGO_FALLBACK,
+                    logo: newBizImage || undefined,
                     phone: newBizPhone.trim() || undefined,
                     address: newBizAddress.trim() || undefined,
                     glbUrl: DEFAULT_GLOBAL_GLB,

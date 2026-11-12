@@ -46,29 +46,64 @@
   </script>
 
   <style>
-    /* Welcome Screen Keyframe Animations */
-    @keyframes welcomeZoom {
+    /* PARTE B: EFECTO HOLOGRAMA 3D EN LA BIENVENIDA */
+    @keyframes hologramEntry {
       0% {
         opacity: 0;
-        transform: scale(0.6) translateY(20px);
+        transform: rotateY(90deg) scale(0.6) translateY(30px);
       }
       100% {
         opacity: 1;
-        transform: scale(1) translateY(0);
+        transform: rotateY(0deg) scale(1) translateY(0px);
       }
     }
 
-    @keyframes welcomeFloat {
+    @keyframes hologramFloat {
       0%, 100% {
-        transform: translateY(0px);
+        transform: translateY(0px) rotateY(0deg);
       }
       50% {
-        transform: translateY(-8px);
+        transform: translateY(-12px) rotateY(6deg);
       }
     }
 
-    .welcome-logo-animate {
-      animation: welcomeZoom 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards, welcomeFloat 4s ease-in-out infinite 0.9s;
+    @keyframes shimmerSweep {
+      0% {
+        transform: translateX(-150%) skewX(-20deg);
+      }
+      20%, 100% {
+        transform: translateX(200%) skewX(-20deg);
+      }
+    }
+
+    @keyframes floorShadowPulse {
+      0%, 100% {
+        transform: translateX(-50%) scale(1);
+        opacity: 0.3;
+      }
+      50% {
+        transform: translateX(-50%) scale(0.75);
+        opacity: 0.15;
+      }
+    }
+
+    .hologram-wrapper {
+      animation: hologramEntry 1s cubic-bezier(0.16, 1, 0.3, 1) forwards, hologramFloat 4s ease-in-out infinite 1s;
+      transform-style: preserve-3d;
+    }
+
+    .shimmer-sweep {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(232, 202, 140, 0.35), transparent);
+      animation: shimmerSweep 3s infinite ease-in-out;
+    }
+
+    .floor-shadow {
+      animation: floorShadowPulse 4s ease-in-out infinite;
     }
 
     #welcome-screen.fade-out {
@@ -76,6 +111,16 @@
       transform: scale(1.04);
       pointer-events: none;
       transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+
+    /* Accessibility: Respect prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      .hologram-wrapper,
+      .shimmer-sweep,
+      .floor-shadow,
+      .ambient-glow {
+        animation: none !important;
+      }
     }
 
     /* Ambient Pulsing Glow */
@@ -86,42 +131,58 @@
     .ambient-glow {
       animation: pulseGlow 5s infinite ease-in-out;
     }
-
-    /* Shimmer Effect on Buttons */
-    .shimmer-btn {
-      background: linear-gradient(90deg, #4f46e5 0%, #6366f1 50%, #4f46e5 100%);
-      background-size: 200% auto;
-      transition: all 0.3s ease;
-    }
-    .shimmer-btn:hover {
-      background-position: right center;
-    }
   </style>
 </head>
 
 <body class="bg-obsidian-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-champagne-500 selection:text-slate-950 overflow-x-hidden font-sans">
   
-  <!-- Animated Welcome Screen Overlay (Full Screen Splash - Exact Same Loved Design) -->
+  <!-- Animated Welcome Screen Overlay (Full Screen Splash - Hologram 3D AR Effect) -->
   <div id="welcome-screen" class="fixed inset-0 z-50 bg-obsidian-950 flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
     <!-- Ambient Golden Glow Background -->
     <div class="absolute w-80 h-80 sm:w-96 sm:h-96 bg-champagne-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
     <div class="absolute w-64 h-64 bg-indigo-600/15 rounded-full blur-[100px] pointer-events-none"></div>
 
-    <!-- 3D Tilting Card Container -->
-    <div id="welcome-card" class="relative z-10 flex flex-col items-center max-w-xs sm:max-w-sm w-full transition-transform duration-200 ease-out" style="perspective: 800px; transform-style: preserve-3d;">
+    <!-- Holographic Floor Rings (Base Holográfica) -->
+    <div class="absolute bottom-28 w-60 h-20 rounded-full border border-champagne-500/40 opacity-70 animate-ping pointer-events-none" style="transform: rotateX(70deg);"></div>
+    <div class="absolute bottom-28 w-40 h-14 rounded-full border-2 border-champagne-400/60 opacity-80 animate-pulse pointer-events-none" style="transform: rotateX(70deg);"></div>
+
+    <!-- Floating Gold Particles (Partículas) -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      <div class="absolute w-1.5 h-1.5 bg-champagne-400 rounded-full animate-ping top-1/4 left-1/4 opacity-70" style="animation-duration: 3s;"></div>
+      <div class="absolute w-2 h-2 bg-amber-300 rounded-full animate-pulse top-1/3 right-1/4 opacity-80" style="animation-duration: 4s;"></div>
+      <div class="absolute w-1 h-1 bg-champagne-300 rounded-full animate-ping bottom-1/3 left-1/3 opacity-60" style="animation-duration: 2.5s;"></div>
+      <div class="absolute w-1.5 h-1.5 bg-champagne-500 rounded-full animate-pulse bottom-1/4 right-1/3 opacity-90" style="animation-duration: 5s;"></div>
+      <div class="absolute w-1 h-1 bg-amber-400 rounded-full animate-ping top-1/2 left-1/5 opacity-75" style="animation-duration: 3.5s;"></div>
+    </div>
+
+    <!-- 3D Hologram Container with Perspective & Tilt -->
+    <div id="welcome-card" class="relative z-10 flex flex-col items-center max-w-xs sm:max-w-sm w-full transition-transform duration-100 ease-out" style="perspective: 800px; transform-style: preserve-3d;">
       
-      <!-- Animated Logo Wrapper with Golden Glow & Float -->
-      <div id="logo-container" class="relative mb-6 welcome-logo-animate">
-        <!-- Golden Glow Circle Behind Logo -->
-        <div class="absolute -inset-4 bg-gradient-to-r from-champagne-500/50 via-amber-400/60 to-champagne-600/50 rounded-full blur-xl animate-pulse"></div>
+      <!-- Hologram Wrapper with Entry, Float, and Shimmer -->
+      <div id="logo-container" class="relative mb-6 hologram-wrapper">
+        <!-- Parallax Background Halo -->
+        <div class="absolute -inset-6 bg-gradient-to-r from-champagne-500/45 via-amber-400/55 to-champagne-600/45 rounded-full blur-2xl animate-pulse pointer-events-none"></div>
         
-        <!-- Business Logo Image -->
-        <img
-          id="welcome-logo"
-          src="./logo.png"
-          alt="Logo del negocio"
-          class="relative w-28 h-28 sm:w-36 sm:h-36 object-contain rounded-3xl border-2 border-champagne-500/60 shadow-2xl shadow-champagne-500/40 bg-obsidian-900/90 p-3"
-        />
+        <!-- Floor Shadow (Sombra en el piso) -->
+        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 w-32 h-6 bg-champagne-500/30 rounded-full blur-md floor-shadow"></div>
+
+        {/* Fake 3D Thickness Layers (Grosor falso: 4 copias apiladas) */}
+        <div class="absolute inset-0 translate-z-1 opacity-25 rounded-2xl bg-champagne-600/30 blur-xs"></div>
+        <div class="absolute inset-0 translate-z-3 opacity-20 rounded-2xl bg-champagne-500/25 blur-xs"></div>
+        <div class="absolute inset-0 translate-z-5 opacity-15 rounded-2xl bg-amber-400/20 blur-xs"></div>
+
+        <!-- Business Logo Image (with Shimmer Sweep & Transparency check) -->
+        <div class="relative overflow-hidden rounded-3xl border-2 border-champagne-500/60 shadow-2xl shadow-champagne-500/40 bg-obsidian-900/90 p-3 hologram-logo-box">
+          <!-- Shimmer Sweep Bar (Brillo barrido) -->
+          <div class="absolute inset-0 shimmer-sweep pointer-events-none"></div>
+
+          <img
+            id="welcome-logo"
+            src="./logo.png"
+            alt="Logo del negocio"
+            class="relative w-28 h-28 sm:w-36 sm:h-36 object-contain block mx-auto"
+          />
+        </div>
       </div>
 
       <!-- Business Name & Subtitle -->
@@ -133,7 +194,7 @@
           Cargando Negocio...
         </h2>
         <p class="text-xs text-slate-400 max-w-xs mx-auto pt-1">
-          Tu plataforma de reservas inmediatas directas.
+          Holograma 3D · Reserva inmediata en realidad aumentada.
         </p>
       </div>
 
@@ -149,7 +210,7 @@
 
       <!-- Auto-countdown text indicator -->
       <span class="text-[10px] text-slate-500 font-mono mt-3">
-        Ingresando a la reserva en 3 segundos...
+        Pasando a reserva en 3 segundos...
       </span>
     </div>
   </div>
