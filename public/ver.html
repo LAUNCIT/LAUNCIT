@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Realidad Aumentada & Reserva — Launcit</title>
-  <meta name="description" content="Visualiza el logotipo 3D en Realidad Aumentada y reserva directamente en Launcit" />
+  <title>Reserva Directa — Launcit</title>
+  <meta name="description" content="Reserva directamente en tu negocio preferido sin registro en Launcit" />
   <meta name="theme-color" content="#09090C" />
 
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
@@ -14,9 +14,6 @@
 
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-
-  <!-- Google Model Viewer (WebAR standard for Android Scene Viewer & iOS Quick Look) -->
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -81,38 +78,6 @@
       transition: opacity 0.6s ease-out, transform 0.6s ease-out;
     }
 
-    /* Keyframes & Class for Smooth Entry Animation */
-    @keyframes fadeInScale {
-      0% {
-        opacity: 0;
-        transform: scale(0.9);
-      }
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
-    .fade-in-scale {
-      animation: fadeInScale 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      will-change: opacity, transform;
-    }
-
-    /* Model Viewer Custom Styling */
-    model-viewer {
-      width: 100%;
-      height: 100%;
-      background-color: transparent;
-      --poster-color: transparent;
-      --progress-bar-color: #D4AF37;
-      --progress-mask: transparent;
-      opacity: 0;
-    }
-
-    model-viewer.loaded {
-      opacity: 1;
-    }
-
     /* Ambient Pulsing Glow */
     @keyframes pulseGlow {
       0%, 100% { opacity: 0.6; transform: scale(1); }
@@ -136,7 +101,7 @@
 
 <body class="bg-obsidian-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-champagne-500 selection:text-slate-950 overflow-x-hidden font-sans">
   
-  <!-- Animated Welcome Screen Overlay (Full Screen Splash) -->
+  <!-- Animated Welcome Screen Overlay (Full Screen Splash - Exact Same Loved Design) -->
   <div id="welcome-screen" class="fixed inset-0 z-50 bg-obsidian-950 flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
     <!-- Ambient Golden Glow Background -->
     <div class="absolute w-80 h-80 sm:w-96 sm:h-96 bg-champagne-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
@@ -168,7 +133,7 @@
           Cargando Negocio...
         </h2>
         <p class="text-xs text-slate-400 max-w-xs mx-auto pt-1">
-          Tu plataforma de reservas inmediatas en Realidad Aumentada 3D.
+          Tu plataforma de reservas inmediatas directas.
         </p>
       </div>
 
@@ -178,7 +143,7 @@
         type="button"
         class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-champagne-500 via-amber-400 to-champagne-600 text-slate-950 font-black text-sm uppercase tracking-wider shadow-xl shadow-champagne-500/30 hover:shadow-champagne-500/50 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
       >
-        <span>Reservar ahora</span>
+        <span>RESERVAR AHORA</span>
         <i class="fa-solid fa-arrow-right"></i>
       </button>
 
@@ -196,90 +161,37 @@
   <!-- Main Container (Mobile-first app style) -->
   <main class="relative z-10 w-full max-w-md mx-auto p-4 sm:p-6 flex flex-col flex-1 justify-between gap-5">
 
-    <!-- Top Navigation & Brand Header -->
-    <header class="space-y-3 pt-2 text-center">
+    <!-- Top Navigation & Business Brand Header (Replaces LAUNCIT 3D & RESERVA) -->
+    <header class="space-y-4 pt-2 text-center">
       <div class="flex items-center justify-between gap-2 px-1">
-        <!-- Logo & Brand Badge -->
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-obsidian-900 border border-champagne-500/30 text-champagne-400 text-[11px] font-mono font-bold tracking-widest uppercase shadow-lg">
-          <i class="fa-solid fa-cube text-champagne-400"></i>
-          <span>LAUNCIT 3D & RESERVA</span>
+        <!-- Logo Thumbnail + Business Badge -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-obsidian-900 border border-champagne-500/40 text-champagne-400 text-xs font-mono font-bold tracking-wider shadow-lg">
+          <img id="header-logo" src="./logo.png" alt="Logo" class="w-5 h-5 object-contain rounded-full border border-champagne-500/50 bg-obsidian-950 p-0.5 shrink-0" />
+          <span id="header-badge-name" class="truncate max-w-[160px]">LAUNCIT</span>
         </div>
 
         <!-- Share Button -->
-        <button id="btn-share" type="button" class="w-9 h-9 rounded-full bg-obsidian-900/90 border border-obsidian-800 text-slate-400 hover:text-white flex items-center justify-center transition-all hover:border-champagne-500/40 cursor-pointer">
+        <button id="btn-share" type="button" class="w-9 h-9 rounded-full bg-obsidian-900/90 border border-obsidian-800 text-slate-400 hover:text-white flex items-center justify-center transition-all hover:border-champagne-500/40 cursor-pointer" title="Compartir enlace">
           <i class="fa-solid fa-share-nodes text-xs"></i>
         </button>
       </div>
 
-      <!-- Scanned Business Name Presentation -->
-      <div class="space-y-1 pt-1">
-        <p class="text-[10px] font-bold tracking-widest uppercase font-mono text-indigo-400">
-          Experiencia Interactiva & Reservas
-        </p>
+      <!-- Business Name Presentation -->
+      <div class="space-y-1.5 pt-1">
         <h1 id="biz-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight break-words">
           Cargando Negocio...
         </h1>
         <p class="text-xs text-slate-400">
-          Explora el modelo 3D en Realidad Aumentada o realiza tu reserva en instantes.
+          Reserva tu servicio o cita en segundos sin registros ni contraseñas.
         </p>
       </div>
     </header>
-
-    <!-- 3D WebAR Viewer Card -->
-    <section class="relative w-full aspect-square max-h-[360px] rounded-3xl bg-gradient-to-b from-obsidian-900 via-obsidian-900 to-obsidian-950 border border-indigo-500/30 shadow-2xl overflow-hidden flex items-center justify-center">
-      
-      <!-- Interactive 360 Hint Badge -->
-      <div class="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-xl bg-obsidian-950/80 backdrop-blur-md border border-white/10 text-[10px] font-mono text-slate-300 flex items-center gap-1.5 pointer-events-none">
-        <i class="fa-solid fa-arrows-rotate text-champagne-400 text-xs animate-spin" style="animation-duration: 8s;"></i>
-        <span>Gira 360° con tu dedo</span>
-      </div>
-
-      <!-- Loading / Progress Indicator -->
-      <div id="loading-spinner" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-obsidian-950/80 backdrop-blur-sm transition-opacity duration-300">
-        <div class="w-10 h-10 border-2 border-indigo-500/30 border-t-champagne-500 rounded-full animate-spin mb-2"></div>
-        <span class="text-xs font-mono text-slate-400 tracking-wider">Cargando modelo 3D...</span>
-      </div>
-
-      <!-- Google <model-viewer> Element -->
-      <model-viewer
-        id="ar-viewer"
-        class="fade-in-scale"
-        src="logo_launcit.glb"
-        alt="Logo Launcit"
-        auto-rotate
-        camera-controls
-        ar
-        ar-modes="scene-viewer quick-look webxr"
-        shadow-intensity="1"
-        style="width:100%; height:300px; background:transparent;"
-        poster="./logo.png"
-        rotation-per-second="25deg"
-        shadow-softness="0.8"
-        exposure="1.0"
-        environment-image="neutral"
-        touch-action="pan-y"
-      >
-        <!-- Native AR Button Slot inside model-viewer -->
-        <button slot="ar-button" id="default-ar-button" class="hidden" aria-hidden="true"></button>
-      </model-viewer>
-
-    </section>
-
-    <!-- AR Launch Action -->
-    <button
-      id="btn-launch-ar"
-      type="button"
-      class="shimmer-btn w-full py-3.5 px-6 rounded-2xl text-white font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-all cursor-pointer"
-    >
-      <i class="fa-solid fa-camera-retro text-base animate-pulse"></i>
-      <span>Ver en tu espacio (AR)</span>
-    </button>
 
     <!-- Feedback / Guidance Notification -->
     <div id="ar-status" class="hidden p-3 rounded-xl bg-indigo-950/80 border border-indigo-500/40 text-xs text-indigo-200 text-center font-medium">
     </div>
 
-    <!-- In-Page Reservation Form Section (Sin redirigir a otra página) -->
+    <!-- In-Page Reservation Form Section (Contenido Principal) -->
     <section id="booking-section" class="w-full bg-obsidian-900/90 border border-obsidian-800 rounded-3xl p-5 space-y-4 shadow-xl">
       <div class="flex items-center justify-between border-b border-obsidian-800 pb-3">
         <div class="flex items-center gap-2">
@@ -291,7 +203,7 @@
             <p class="text-[11px] text-slate-400">Sin contraseñas ni registros</p>
           </div>
         </div>
-        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md font-bold">
           Disponibilidad Libre
         </span>
       </div>
@@ -321,6 +233,7 @@
             3. Hora
           </label>
           <select id="select-time" class="w-full bg-obsidian-850 border border-obsidian-750 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-champagne-500/60">
+            <option value="09:00 AM">09:00 AM</option>
             <option value="10:00 AM">10:00 AM</option>
             <option value="11:30 AM">11:30 AM</option>
             <option value="02:00 PM">02:00 PM</option>
@@ -350,7 +263,7 @@
       </button>
 
       <!-- Confirmation Output Card (Hidden initially) -->
-      <div id="booking-confirmation" class="hidden p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-2 text-center animate-fade-in">
+      <div id="booking-confirmation" class="hidden p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-2 text-center">
         <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center text-lg">
           <i class="fa-solid fa-circle-check"></i>
         </div>
@@ -367,7 +280,7 @@
 
     <!-- Footer Copyright -->
     <footer class="pt-2 pb-2 text-center text-[10px] text-slate-500 font-mono">
-      <span>Desarrollado con WebAR & Reservas Directas</span> • <span class="text-champagne-400 font-bold">Launcit</span>
+      <span>Reservas Directas</span> • <span class="text-champagne-400 font-bold">Launcit</span>
     </footer>
 
   </main>
@@ -375,16 +288,15 @@
   <!-- Interactive JavaScript Logic -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const viewer = document.getElementById('ar-viewer');
       const bizTitle = document.getElementById('biz-title');
+      const headerLogo = document.getElementById('header-logo');
+      const headerBadgeName = document.getElementById('header-badge-name');
       const welcomeBizName = document.getElementById('welcome-biz-name');
       const welcomeLogo = document.getElementById('welcome-logo');
       const welcomeCard = document.getElementById('welcome-card');
       const welcomeScreen = document.getElementById('welcome-screen');
       const btnWelcomeBook = document.getElementById('btn-welcome-book');
-      const btnLaunchAr = document.getElementById('btn-launch-ar');
       const btnShare = document.getElementById('btn-share');
-      const loadingSpinner = document.getElementById('loading-spinner');
       const arStatus = document.getElementById('ar-status');
 
       // Set default date picker value to today
@@ -394,30 +306,29 @@
         inputDate.value = today;
       }
 
-      // 1. Parse Business Name, Logo Image, and 3D Model from URL Parameters
+      // 1. Parse Business Name & Logo Image from URL Parameters
       const urlParams = new URLSearchParams(window.location.search);
       const rawBizName = urlParams.get('negocio') || urlParams.get('venue') || urlParams.get('nombre') || urlParams.get('id');
       const customLogoImg = urlParams.get('logo') || urlParams.get('image');
-      const customLogoGlb = urlParams.get('logo3d') || urlParams.get('glb') || urlParams.get('model');
 
       const businessName = rawBizName ? decodeURIComponent(rawBizName).trim() : 'Negocio Asociado';
       
-      // Update titles
+      // Update page title and business names
       if (bizTitle) bizTitle.textContent = businessName;
       if (welcomeBizName) welcomeBizName.textContent = businessName;
-      document.title = `${businessName} — Realidad Aumentada & Reserva | Launcit`;
+      if (headerBadgeName) headerBadgeName.textContent = businessName;
+      document.title = `${businessName} — Reserva Directa | Launcit`;
 
       // Update business logo image or fallback to ./logo.png
+      const logoSrc = customLogoImg || './logo.png';
+      
       if (welcomeLogo) {
-        welcomeLogo.src = customLogoImg || './logo.png';
-        welcomeLogo.onerror = () => {
-          welcomeLogo.src = './logo.png';
-        };
+        welcomeLogo.src = logoSrc;
+        welcomeLogo.onerror = () => { welcomeLogo.src = './logo.png'; };
       }
-
-      // Update 3D model GLB if custom parameter provided
-      if (customLogoGlb && viewer) {
-        viewer.src = customLogoGlb;
+      if (headerLogo) {
+        headerLogo.src = logoSrc;
+        headerLogo.onerror = () => { headerLogo.src = './logo.png'; };
       }
 
       // 2. Simulated 3D Tilt Effect on mouse / touch / gyro for Welcome Card
@@ -475,58 +386,12 @@
       // Auto dismiss after 3 seconds
       setTimeout(dismissWelcomeScreen, 3000);
 
-      // 4. Hide Spinner & Trigger Smooth Entry Transition when 3D Model is Loaded
-      const revealViewer = () => {
-        if (loadingSpinner) {
-          loadingSpinner.style.opacity = '0';
-          setTimeout(() => { loadingSpinner.style.display = 'none'; }, 300);
-        }
-        if (viewer) {
-          viewer.classList.add('fade-in-scale');
-          viewer.classList.add('loaded');
-        }
-      };
-
-      if (viewer.loaded) {
-        revealViewer();
-      } else {
-        viewer.addEventListener('load', revealViewer);
-      }
-
-      viewer.addEventListener('error', (e) => {
-        console.warn('Notice loading primary GLB, activating fallback model:', e);
-        revealViewer();
-        if (!viewer.src.includes('Astronaut.glb')) {
-          viewer.src = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
-        }
-      });
-
-      // 5. Activate Native Augmented Reality (Android Scene Viewer / iOS Quick Look / WebXR)
-      if (btnLaunchAr) {
-        btnLaunchAr.addEventListener('click', () => {
-          if (typeof viewer.activateAR === 'function') {
-            try {
-              viewer.activateAR();
-            } catch (err) {
-              showStatusMessage('Abre este enlace desde tu celular Android o iPhone para proyectar en tu cámara.');
-            }
-          } else {
-            const slotBtn = document.getElementById('default-ar-button');
-            if (slotBtn) {
-              slotBtn.click();
-            } else {
-              showStatusMessage('Abre este enlace desde un celular para activar la Realidad Aumentada nativa.');
-            }
-          }
-        });
-      }
-
-      // 6. Native Share API
+      // 4. Native Share API
       if (btnShare) {
         btnShare.addEventListener('click', () => {
           const shareData = {
-            title: `${businessName} — Realidad Aumentada & Reserva Launcit`,
-            text: `Mira la experiencia 3D y realiza tu reserva en ${businessName}:`,
+            title: `${businessName} — Reserva Directa Launcit`,
+            text: `Realiza tu reserva de forma inmediata en ${businessName}:`,
             url: window.location.href,
           };
 
@@ -534,12 +399,12 @@
             navigator.share(shareData).catch(() => {});
           } else if (navigator.clipboard) {
             navigator.clipboard.writeText(window.location.href);
-            showStatusMessage('¡Enlace copiado al portapapeles!');
+            showStatusMessage('¡Enlace de reserva copiado al portapapeles!');
           }
         });
       }
 
-      // 7. In-Page Booking Confirmation Handler
+      // 5. In-Page Booking Confirmation Handler
       const btnConfirmBooking = document.getElementById('btn-confirm-booking');
       const bookingConfirmation = document.getElementById('booking-confirmation');
       const confirmationText = document.getElementById('confirmation-text');
