@@ -77,6 +77,7 @@ import { ClientWorld } from './components/ClientWorld';
 import { BusinessPanel } from './components/BusinessPanel';
 import { BookingWizardModal } from './components/BookingWizardModal';
 import { AuthScreen } from './components/AuthScreen';
+import { ProfileDropdown } from './components/ProfileDropdown';
 import { SmartQRSplashModal } from './components/SmartQRSplashModal';
 
 export default function App() {
@@ -450,42 +451,35 @@ export default function App() {
     }
   }, [venues]);
 
-  // Role Transition Handlers
-  const handleRequestBusinessAccess = () => {
-    setMobileMenuOpen(false);
-    if (isBusinessAuthenticated) {
-      setRole('business');
-    } else {
-      setIsBusinessAuthOpen(true);
+  const goToHome = () => {
+    if (businessView !== 'dashboard') {
+      if (!window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
     }
-  };
-
-  const handleBusinessAuthenticated = (email: string, idToken?: string) => {
-    setPartnerEmail(email);
-    if (idToken) setAuthToken(idToken);
-    setIsBusinessAuthenticated(true);
-    setIsBusinessAuthOpen(false);
-    setRole('business');
-    setBusinessView('dashboard');
-    showToast('Sesión de Socio iniciada en el Panel de Negocio.');
-  };
-
-  const handleExitBusinessToClient = () => {
-    setMobileMenuOpen(false);
     setRole('client');
     setClientView('explore');
-    showToast('Regresaste a la Vista de Cliente (navegación libre).');
+    setMobileMenuOpen(false);
+  };
+
+  const handleRequestBusinessAccess = () => {
+    setMobileMenuOpen(false);
+    if (!user) {
+      setIsBusinessAuthOpen(true);
+      return;
+    }
+    // Simulate check for business
+    setRole('business');
+    setBusinessView('dashboard');
   };
 
   const handleLogoutBusiness = async () => {
     await signOut(auth);
-    setIsBusinessAuthenticated(false);
-    setAuthToken(null);
-    setMobileMenuOpen(false);
     setRole('client');
     setClientView('explore');
-    showToast('Sesión de socio cerrada.');
+    showToast('Sesión cerrada.');
   };
+
+
+
 
   // Client Booking Handlers (Persisted to Cloud SQL without registration)
   const handleOpenBooking = (venue?: Venue) => {
@@ -801,7 +795,7 @@ export default function App() {
         <div className="p-4 space-y-5 overflow-y-auto">
           {/* Brand Logo Header (Space for logo.png + Collapse button) */}
           <div className="flex items-center justify-between gap-2 pb-2">
-            <div className="flex items-center gap-3 min-w-0">
+            <button type="button" onClick={goToHome} className="flex items-center gap-3 min-w-0" aria-label="Ir al inicio">
               <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-obsidian-950 border border-champagne-500/40 flex items-center justify-center animate-glow">
                 <ResilientImage
                   src="./logo.png"
@@ -821,7 +815,8 @@ export default function App() {
                   </span>
                 </div>
               )}
-            </div>
+            </button>
+
 
             <button
               type="button"
@@ -969,61 +964,30 @@ export default function App() {
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-sand-200 dark:border-obsidian-800">
-          {role === 'client' ? (
-            <div
-              className={`flex items-center gap-2.5 p-2 rounded-xl bg-sand-100 dark:bg-obsidian-850 ${
-                sidebarCollapsed ? 'justify-center' : ''
-              }`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-champagne-500/15 text-champagne-600 dark:text-champagne-400 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4" />
-              </div>
-              {!sidebarCollapsed && (
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                    Cliente Invitado
-                  </p>
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium truncate">
-                    Sin registro requerido
-                  </p>
-                </div>
-              )}
+          <div
+            className={`flex items-center gap-2.5 p-2 rounded-xl bg-sand-100 dark:bg-obsidian-850 ${
+              sidebarCollapsed ? 'justify-center' : ''
+            }`}
+          >
+            <div className="w-8 h-8 rounded-lg bg-champagne-500/15 text-champagne-600 dark:text-champagne-400 flex items-center justify-center shrink-0">
+              {user ? <User className="w-4 h-4" /> : <User className="w-4 h-4" />}
             </div>
-          ) : (
-            <div
-              className={`flex items-center justify-between gap-2 p-2 rounded-xl bg-champagne-500/10 border border-champagne-500/20 ${
-                sidebarCollapsed ? 'justify-center' : ''
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-champagne-500 text-slate-950 flex items-center justify-center shrink-0">
-                  <Store className="w-4 h-4" />
-                </div>
-                {!sidebarCollapsed && (
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                      Glow Flagship
-                    </p>
-                    <p className="text-[11px] text-champagne-600 dark:text-champagne-400 font-semibold uppercase truncate">
-                      Plan {activePlan}
-                    </p>
-                  </div>
+            {!sidebarCollapsed && (
+              <div className="min-w-0">
+                {user ? (
+                  <>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.email}</p>
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium truncate">Sesión iniciada</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Cliente Invitado</p>
+                    <button onClick={() => setIsBusinessAuthOpen(true)} className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium truncate hover:underline">Iniciar sesión</button>
+                  </>
                 )}
               </div>
-
-              {!sidebarCollapsed && (
-                <button
-                  type="button"
-                  onClick={handleLogoutBusiness}
-                  title="Cerrar sesión de negocio"
-                  aria-label="Cerrar sesión de negocio"
-                  className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-500 transition-colors shrink-0"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </aside>
 
@@ -1103,7 +1067,7 @@ export default function App() {
               </button>
             ) : null}
 
-            {role === 'client' ? (
+            {role === 'client' && (
               <button
                 type="button"
                 onClick={handleRequestBusinessAccess}
@@ -1112,15 +1076,12 @@ export default function App() {
                 <Store className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
                 <span className="hidden xs:inline">Propietario</span>
               </button>
+            )}
+            
+            {user ? (
+              <ProfileDropdown onGoToPanel={handleRequestBusinessAccess} onLogout={handleLogoutBusiness} />
             ) : (
-              <button
-                type="button"
-                onClick={handleExitBusinessToClient}
-                className="px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-sand-300 dark:border-obsidian-700 bg-sand-100 dark:bg-obsidian-800 text-slate-700 dark:text-slate-200 hover:border-champagne-500 text-[10px] sm:text-xs font-bold transition-colors flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0"
-              >
-                <ArrowLeft className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
-                <span className="hidden xs:inline">Volver</span>
-              </button>
+              <button onClick={() => setIsBusinessAuthOpen(true)} className="text-xs font-bold text-slate-600 dark:text-slate-400">Acceder</button>
             )}
 
             <button
