@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <!-- Google Model Viewer (WebAR standard for Android Scene Viewer & iOS Quick Look) -->
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -49,6 +49,23 @@
   </script>
 
   <style>
+    /* Keyframes & Class for Smooth Entry Animation */
+    @keyframes fadeInScale {
+      0% {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .fade-in-scale {
+      animation: fadeInScale 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: opacity, transform;
+    }
+
     /* Model Viewer Custom Styling */
     model-viewer {
       width: 100%;
@@ -57,6 +74,11 @@
       --poster-color: transparent;
       --progress-bar-color: #D4AF37;
       --progress-mask: transparent;
+      opacity: 0;
+    }
+
+    model-viewer.loaded {
+      opacity: 1;
     }
 
     /* Ambient Pulsing Glow */
@@ -136,19 +158,21 @@
       <!-- Google <model-viewer> Element -->
       <model-viewer
         id="ar-viewer"
-        src="./logo_launcit.glb"
-        poster="./logo.png"
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        camera-controls
+        class="fade-in-scale"
+        src="logo_launcit.glb"
+        alt="Logo Launcit"
         auto-rotate
+        camera-controls
+        ar
+        ar-modes="scene-viewer quick-look webxr"
+        shadow-intensity="1"
+        style="width:100%; height:300px; background:transparent;"
+        poster="./logo.png"
         rotation-per-second="25deg"
-        shadow-intensity="1.5"
         shadow-softness="0.8"
         exposure="1.0"
         environment-image="neutral"
         touch-action="pan-y"
-        alt="Logotipo 3D Oficial de Launcit en Realidad Aumentada"
       >
         <!-- Native AR Button Slot inside model-viewer -->
         <button slot="ar-button" id="default-ar-button" class="hidden" aria-hidden="true"></button>
@@ -205,9 +229,15 @@
       const arStatus = document.getElementById('ar-status');
       const btnVisitPortal = document.getElementById('btn-visit-portal');
 
-      // 1. Parse Business Name from URL Query Parameter (?negocio=... or ?id=...)
+      // 1. Parse Business Name and Custom 3D Logo from URL Query Parameters
       const urlParams = new URLSearchParams(window.location.search);
       const rawBizName = urlParams.get('negocio') || urlParams.get('venue') || urlParams.get('nombre') || urlParams.get('id');
+      const customLogoGlb = urlParams.get('logo3d') || urlParams.get('glb') || urlParams.get('model');
+
+      if (customLogoGlb && viewer) {
+        // Allows replacing default logo_launcit.glb with custom business 3D logo in the future
+        viewer.src = customLogoGlb;
+      }
       
       const businessName = rawBizName ? decodeURIComponent(rawBizName).trim() : 'Negocio Asociado';
       bizTitle.textContent = businessName;
@@ -218,20 +248,28 @@
         btnVisitPortal.href = `./?negocio=${encodeURIComponent(businessName)}`;
       }
 
-      // 2. Hide Spinner when 3D Model is Loaded
-      viewer.addEventListener('load', () => {
+      // 2. Hide Spinner & Trigger Smooth Entry Transition when 3D Model is Loaded
+      const revealViewer = () => {
         if (loadingSpinner) {
           loadingSpinner.style.opacity = '0';
           setTimeout(() => { loadingSpinner.style.display = 'none'; }, 300);
         }
-      });
+        if (viewer) {
+          viewer.classList.add('fade-in-scale');
+          viewer.classList.add('loaded');
+        }
+      };
+
+      if (viewer.loaded) {
+        revealViewer();
+      } else {
+        viewer.addEventListener('load', revealViewer);
+      }
 
       // 3. Fallback if model fails (e.g. if logo_launcit.glb was unreachable)
       viewer.addEventListener('error', (e) => {
         console.warn('Notice loading primary GLB, activating fallback model:', e);
-        if (loadingSpinner) {
-          loadingSpinner.style.display = 'none';
-        }
+        revealViewer();
         // Fallback to demo model if local GLB is missing
         if (!viewer.src.includes('Astronaut.glb')) {
           viewer.src = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
