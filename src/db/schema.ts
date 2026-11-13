@@ -55,6 +55,7 @@ export const professionals = pgTable('professionals', {
 export const appointments = pgTable('appointments', {
   id: text('id').primaryKey(),
   code: text('code').notNull(),
+  venueId: text('venue_id').notNull(),
   venueName: text('venue_name').notNull(),
   client: text('client').notNull(),
   phone: text('phone').notNull(),
@@ -69,6 +70,8 @@ export const appointments = pgTable('appointments', {
   time: text('time').notNull(),
   price: integer('price').notNull(),
   status: text('status').default('Confirmada').notNull(),
+  consentWhatsApp: boolean('consent_whatsapp').default(false),
+  reminderSent: boolean('reminder_sent').default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

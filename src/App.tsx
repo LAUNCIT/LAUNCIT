@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  ArrowLeft,
+  Activity,
   Briefcase,
   Calendar,
   CalendarCheck,
@@ -14,13 +14,11 @@ import {
   HelpCircle,
   ListChecks,
   Lock,
-  LogOut,
   Menu,
   MessageCircle,
   MessageSquare,
   Moon,
   PieChart,
-  SearchCheck,
   Store,
   Sun,
   User,
@@ -29,6 +27,7 @@ import {
   QrCode,
   WifiOff,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   OFFLINE_STORAGE_KEYS,
@@ -39,9 +38,11 @@ import {
   flushOfflineQueue,
 } from './utils/offlineSync';
 import {
+  ActivityLogItem,
   Appointment,
   AppRole,
   BlockedSlot,
+  BusinessMember,
   BusinessSubView,
   ClientSubView,
   DayName,
@@ -51,6 +52,7 @@ import {
   SaasPlanId,
   ServiceItem,
   SmsConfig,
+  UserRole,
   Venue,
   WhatsAppConfig,
   WorkingDayConfig,
@@ -69,34 +71,86 @@ import {
   INITIAL_WORKING_DAYS,
 } from './data/initialData';
 import { formatCOP } from './utils/scheduleUtils';
+import {
+  canAccessView,
+  getDefaultViewForRole,
+  getPlanDisplayName,
+  getPlanUserLimit,
+  ROLE_LABELS,
+} from './utils/permissions';
 import { useAuth } from './context/AuthContext';
-import { signOut } from 'firebase/auth';
-import { auth } from './firebase';
+import { sendPasswordResetEmail, signOut } from 'firebase/auth';
+import {
+  auth,
+  createMemberAccountWithSecondaryAuth,
+  db,
+} from './firebase';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { ResilientImage } from './components/ResilientImage';
 import { ClientWorld } from './components/ClientWorld';
 import { BusinessPanel } from './components/BusinessPanel';
 import { BookingWizardModal } from './components/BookingWizardModal';
 import { AuthScreen } from './components/AuthScreen';
+import { CompleteBusinessScreen } from './components/CompleteBusinessScreen';
+import { BusinessSelectorScreen } from './components/BusinessSelectorScreen';
+import { MustChangePasswordScreen } from './components/MustChangePasswordScreen';
 import { ProfileDropdown } from './components/ProfileDropdown';
 import { SmartQRSplashModal } from './components/SmartQRSplashModal';
 
 export default function App() {
-  const { user, loading } = useAuth();
-  
+  const {
+    user,
+    loading,
+    memberships,
+    activeBusiness,
+    activeMember,
+    userRole,
+    needsBusinessSelection,
+    mustChangePassword,
+    authError,
+    selectBusiness,
+    refreshSessionData,
+    logActivity,
+    refreshActiveBusinessDoc,
+  } = useAuth();
+
   type NavigationView = 'inicio' | 'login' | 'completar-negocio' | 'panel';
   const [view, setView] = useState<NavigationView>('inicio');
   const [role, setRole] = useState<AppRole>('client');
-  const [partnerEmail, setPartnerEmail] = useState('admin@launcit.com');
+  const [teamMembers, setTeamMembers] = useState<BusinessMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
-  const navigateTo = (newView: NavigationView) => {
-    if (view === 'panel' && newView !== 'panel') {
-      if (!window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
-    }
-    setView(newView);
-    if (newView === 'panel' || newView === 'completar-negocio') setRole('business');
-    else setRole('client');
-    setMobileMenuOpen(false);
-  };
+  const navigateTo = useCallback(
+    (newView: NavigationView) => {
+      if (view === 'panel' && newView !== 'panel') {
+        if (
+          !window.confirm(
+            '¿Seguro que quieres salir del Panel de Negocio?'
+          )
+        )
+          return;
+      }
+      setView(newView);
+      if (newView === 'panel' || newView === 'completar-negocio')
+        setRole('business');
+      else setRole('client');
+      setMobileMenuOpen(false);
+    },
+    [view]
+  );
 
   // Navigation within each world
   const [clientView, setClientView] = useState<ClientSubView>('explore');
@@ -460,59 +514,480 @@ export default function App() {
     }
   }, [venues]);
 
-  const goToHome = () => {
-    if (view === 'panel' && businessView !== 'dashboard') {
-      if (!window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
+  const fetchTeamMembers = useCallback(async (negocioId: string) => {
+    setTeamLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'negocios', negocioId, 'miembros'));
+      const list = snap.docs.map((d) => ({ ...(d.data() as BusinessMember), uid: d.id }));
+      setTeamMembers(list);
+    } catch (err) {
+      console.warn('Error cargando equipo de acceso:', err);
+    } finally {
+      setTeamLoading(false);
     }
-    navigateTo('inicio');
+  }, []);
+
+  const fetchActivityLogs = useCallback(async (negocioId: string) => {
+    setActivityLoading(true);
+    try {
+      const q = query(
+        collection(db, 'negocios', negocioId, 'actividad'),
+        orderBy('fecha', 'desc')
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({
+        ...(d.data() as Omit<ActivityLogItem, 'id'>),
+        id: d.id,
+      }));
+      setActivityLogs(list);
+    } catch (err) {
+      console.warn('Error cargando registro de actividad:', err);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
+  // Synchronize auth state transitions cleanly
+  useEffect(() => {
+    if (loading) return;
+
+    if (authError && !user) {
+      setView('login');
+      setRole('client');
+      return;
+    }
+
+    if (!user) {
+      if (view === 'panel' || view === 'completar-negocio') {
+        setView('login');
+        setRole('client');
+      }
+      setTeamMembers([]);
+      setActivityLogs([]);
+      return;
+    }
+
+    if (needsBusinessSelection || mustChangePassword) {
+      return;
+    }
+
+    if (memberships.length === 0) {
+      if (view === 'login' || view === 'panel') {
+        setView('completar-negocio');
+        setRole('business');
+      }
+      return;
+    }
+
+    if (activeBusiness && activeMember) {
+      if (view === 'login' || view === 'completar-negocio') {
+        setView('panel');
+        setRole('business');
+      }
+      if (!canAccessView(activeMember.rol, businessView)) {
+        setBusinessView(getDefaultViewForRole(activeMember.rol));
+      }
+    }
+  }, [
+    loading,
+    user,
+    authError,
+    memberships.length,
+    activeBusiness,
+    activeMember,
+    needsBusinessSelection,
+    mustChangePassword,
+    view,
+    businessView,
+  ]);
+
+  // Load business data from Firestore when activeBusiness / activeMember resolves
+  useEffect(() => {
+    if (!user || !activeBusiness || !activeMember) return;
+    const bizId = activeBusiness.id;
+
+    const loadFirestoreBusinessData = async () => {
+      try {
+        if (activeBusiness.plan) {
+          setActivePlan(activeBusiness.plan);
+        }
+        if (activeBusiness.whatsAppConfig) {
+          setWhatsAppConfig(activeBusiness.whatsAppConfig);
+        }
+
+        // Ensure activeBusiness appears at top of venues list for panel operations
+        const activeVenueObj: Venue = {
+          id: activeBusiness.id,
+          name: activeBusiness.name,
+          category: activeBusiness.category,
+          categoryLabel: activeBusiness.categoryLabel || 'Negocio',
+          subCategory: activeBusiness.subCategory,
+          rating: 5.0,
+          location: activeBusiness.location || activeBusiness.address || 'Colombia',
+          priceLevel: '$$',
+          image:
+            activeBusiness.image ||
+            'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80',
+          logo: activeBusiness.logo,
+          photos: activeBusiness.photos,
+          description: activeBusiness.description,
+          phone: activeBusiness.phone,
+          address: activeBusiness.address,
+        };
+        setVenues((prev) => {
+          const rest = prev.filter((v) => v.id !== activeVenueObj.id);
+          return [activeVenueObj, ...rest];
+        });
+
+        // Load horarios
+        try {
+          const horSnap = await getDoc(doc(db, 'negocios', bizId, 'horarios', 'config'));
+          if (horSnap.exists() && horSnap.data()?.workingDays) {
+            setWorkingDays(horSnap.data().workingDays);
+          } else if (activeBusiness.workingDays) {
+            setWorkingDays(activeBusiness.workingDays);
+          }
+        } catch {}
+
+        // Load servicios
+        try {
+          const svcSnap = await getDocs(collection(db, 'negocios', bizId, 'servicios'));
+          if (!svcSnap.empty) {
+            setServices(
+              svcSnap.docs.map((d) => ({ ...(d.data() as ServiceItem), id: d.id }))
+            );
+          }
+        } catch {}
+
+        // Load profesionales
+        try {
+          const proSnap = await getDocs(collection(db, 'negocios', bizId, 'profesionales'));
+          if (!proSnap.empty) {
+            setProfessionals(
+              proSnap.docs.map((d) => ({ ...(d.data() as Professional), id: d.id }))
+            );
+          }
+        } catch {}
+
+        // Load bloqueos
+        try {
+          const blkSnap = await getDocs(collection(db, 'negocios', bizId, 'bloqueos'));
+          if (!blkSnap.empty) {
+            setBlockedSlots(
+              blkSnap.docs.map((d) => ({ ...(d.data() as BlockedSlot), id: d.id }))
+            );
+          }
+        } catch {}
+
+        // Load citas according to role security rules
+        try {
+          const citasRef = collection(db, 'negocios', bizId, 'citas');
+          const citasQ =
+            activeMember.rol === 'trabajador'
+              ? query(citasRef, where('profesionalUid', '==', user.uid))
+              : citasRef;
+          const citasSnap = await getDocs(citasQ);
+          if (!citasSnap.empty) {
+            const cloudAppts = citasSnap.docs.map((d) => ({
+              ...(d.data() as Appointment),
+              id: d.id,
+            }));
+            setAppointments((prev) => {
+              const cloudIds = new Set(cloudAppts.map((a) => a.id));
+              const localOthers = prev.filter((a) => a.venueId !== bizId && !cloudIds.has(a.id));
+              return [...cloudAppts, ...localOthers];
+            });
+          } else if (activeMember.rol === 'trabajador') {
+            // Worker should not see other venues' mock appointments
+            setAppointments((prev) =>
+              prev.filter((a) => a.profesionalUid === user.uid)
+            );
+          }
+        } catch (err) {
+          console.warn('Error cargando citas de Firestore:', err);
+        }
+
+        if (activeMember.rol === 'propietario') {
+          await Promise.all([fetchTeamMembers(bizId), fetchActivityLogs(bizId)]);
+        } else {
+          setTeamMembers([]);
+          setActivityLogs([]);
+        }
+      } catch (err) {
+        console.error('Error cargando datos del negocio en Firestore:', err);
+      }
+    };
+
+    loadFirestoreBusinessData();
+  }, [user, activeBusiness, activeMember, fetchTeamMembers, fetchActivityLogs]);
+
+  const goToHome = () => {
+    if (view === 'panel') {
+      if (!window.confirm('¿Seguro que quieres volver al inicio?')) return;
+    }
+    setView('inicio');
+    setRole('client');
+    setMobileMenuOpen(false);
   };
 
   const handleRequestBusinessAccess = () => {
-    if (!user) navigateTo('login');
-    else if (venues.length === 0) navigateTo('completar-negocio');
-    else navigateTo('panel');
+    if (!user) {
+      navigateTo('login');
+    } else if (memberships.length === 0) {
+      navigateTo('completar-negocio');
+    } else {
+      if (userRole && !canAccessView(userRole, businessView)) {
+        setBusinessView(getDefaultViewForRole(userRole));
+      }
+      navigateTo('panel');
+    }
   };
 
   const handleLogoutBusiness = async () => {
     await signOut(auth);
-    navigateTo('inicio');
+    setView('inicio');
+    setRole('client');
+    setMobileMenuOpen(false);
     showToast('Sesión cerrada.');
+  };
+
+  const handleCreateTeamMember = async (data: {
+    nombre: string;
+    email: string;
+    password: string;
+    rol: UserRole;
+    profesionalId?: string | null;
+    profesionalNombre?: string | null;
+  }) => {
+    if (!activeBusiness || userRole !== 'propietario' || !user) {
+      throw new Error('Solo el propietario puede crear cuentas.');
+    }
+    const limit = getPlanUserLimit(activePlan);
+    if (teamMembers.length >= limit) {
+      throw new Error(
+        `Tu plan (${getPlanDisplayName(activePlan)}) permite máximo ${limit} usuario(s).`
+      );
+    }
+
+    let createdUid = '';
+    try {
+      const res = await createMemberAccountWithSecondaryAuth({
+        email: data.email,
+        password: data.password,
+        nombre: data.nombre,
+        negocioId: activeBusiness.id,
+        negocioNombre: activeBusiness.name,
+        rol: data.rol,
+      });
+      createdUid = res.uid;
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use') {
+        throw new Error(
+          'Este correo ya está registrado en Firebase Auth. Usa un correo distinto para crear una cuenta nueva.'
+        );
+      }
+      if (err?.code === 'auth/weak-password') {
+        throw new Error('La contraseña temporal debe tener mínimo 8 caracteres.');
+      }
+      throw new Error(err?.message || 'Error al crear la cuenta en Firebase.');
+    }
+
+    const newMember: BusinessMember = {
+      uid: createdUid,
+      negocioId: activeBusiness.id,
+      negocioNombre: activeBusiness.name,
+      nombre: data.nombre,
+      email: data.email,
+      rol: data.rol,
+      activo: true,
+      mustChangePassword: true,
+      profesionalId: data.rol === 'trabajador' ? data.profesionalId || null : null,
+      profesionalNombre:
+        data.rol === 'trabajador' ? data.profesionalNombre || null : null,
+      createdAt: new Date().toISOString(),
+      createdBy: user.uid,
+    };
+
+    await setDoc(
+      doc(db, 'negocios', activeBusiness.id, 'miembros', createdUid),
+      newMember
+    );
+
+    if (data.rol === 'trabajador' && data.profesionalId) {
+      const linkedPro = professionals.find((p) => p.id === data.profesionalId);
+      if (linkedPro) {
+        const updatedPro: Professional = { ...linkedPro, linkedUid: createdUid };
+        setProfessionals((prev) =>
+          prev.map((p) => (p.id === linkedPro.id ? updatedPro : p))
+        );
+        await setDoc(
+          doc(db, 'negocios', activeBusiness.id, 'profesionales', linkedPro.id),
+          updatedPro,
+          { merge: true }
+        ).catch(() => {});
+      }
+    }
+
+    await logActivity({
+      accion: 'Usuario creado en Equipo de acceso',
+      detalle: `Se creó la cuenta de ${data.nombre} (${data.email}) con rol ${ROLE_LABELS[data.rol]}${
+        data.profesionalNombre ? ` · Especialista: ${data.profesionalNombre}` : ''
+      }.`,
+      categoria: 'equipo',
+    });
+
+    await Promise.all([
+      fetchTeamMembers(activeBusiness.id),
+      fetchActivityLogs(activeBusiness.id),
+    ]);
+    showToast(`Cuenta creada para ${data.nombre}. Deberá cambiar su clave al ingresar.`);
+  };
+
+  const handleToggleMemberActive = async (member: BusinessMember) => {
+    if (!activeBusiness || userRole !== 'propietario') return;
+    if (member.uid === user?.uid) {
+      showToast('No puedes desactivar tu propia cuenta.');
+      return;
+    }
+    const nextActivo = !member.activo;
+    await updateDoc(
+      doc(db, 'negocios', activeBusiness.id, 'miembros', member.uid),
+      { activo: nextActivo }
+    );
+    await logActivity({
+      accion: nextActivo ? 'Usuario activado' : 'Usuario desactivado',
+      detalle: `${member.nombre} (${member.email}) fue ${nextActivo ? 'activado' : 'desactivado'}.`,
+      categoria: 'equipo',
+    });
+    await Promise.all([
+      fetchTeamMembers(activeBusiness.id),
+      fetchActivityLogs(activeBusiness.id),
+    ]);
+    showToast(
+      `Acceso de ${member.nombre} ${nextActivo ? 'activado' : 'desactivado'}.`
+    );
+  };
+
+  const handleChangeMemberRole = async (
+    member: BusinessMember,
+    newRole: UserRole,
+    profesionalId?: string | null,
+    profesionalNombre?: string | null
+  ) => {
+    if (!activeBusiness || userRole !== 'propietario') return;
+    if (member.uid === user?.uid) {
+      showToast('No puedes cambiar ni quitar tu propio rol.');
+      return;
+    }
+    await updateDoc(
+      doc(db, 'negocios', activeBusiness.id, 'miembros', member.uid),
+      {
+        rol: newRole,
+        profesionalId: newRole === 'trabajador' ? profesionalId || null : null,
+        profesionalNombre:
+          newRole === 'trabajador' ? profesionalNombre || null : null,
+      }
+    );
+
+    if (newRole === 'trabajador' && profesionalId) {
+      const pro = professionals.find((p) => p.id === profesionalId);
+      if (pro) {
+        const updatedPro: Professional = { ...pro, linkedUid: member.uid };
+        setProfessionals((prev) =>
+          prev.map((p) => (p.id === pro.id ? updatedPro : p))
+        );
+        await setDoc(
+          doc(db, 'negocios', activeBusiness.id, 'profesionales', pro.id),
+          updatedPro,
+          { merge: true }
+        ).catch(() => {});
+      }
+    }
+
+    await logActivity({
+      accion: 'Rol de usuario actualizado',
+      detalle: `${member.nombre} (${member.email}) cambió de ${ROLE_LABELS[member.rol]} a ${ROLE_LABELS[newRole]}.`,
+      categoria: 'equipo',
+    });
+    await Promise.all([
+      fetchTeamMembers(activeBusiness.id),
+      fetchActivityLogs(activeBusiness.id),
+    ]);
+    showToast(`Rol de ${member.nombre} actualizado a ${ROLE_LABELS[newRole]}.`);
+  };
+
+  const handleResetMemberPassword = async (member: BusinessMember) => {
+    if (!activeBusiness || userRole !== 'propietario') return;
+    await sendPasswordResetEmail(auth, member.email);
+    await logActivity({
+      accion: 'Restablecimiento de contraseña enviado',
+      detalle: `Se envió correo de restablecimiento de contraseña a ${member.email}.`,
+      categoria: 'equipo',
+    });
+    await fetchActivityLogs(activeBusiness.id);
+    showToast(`Enlace de restablecimiento enviado a ${member.email}.`);
   };
 
 
 
 
-  // Client Booking Handlers (Persisted to Cloud SQL without registration)
+  // Client Booking Handlers (Persisted to Cloud SQL & Firestore without registration)
   const handleOpenBooking = (venue?: Venue) => {
     setBookingInitialVenue(venue || venues[0]);
     setIsBookingModalOpen(true);
   };
 
   const handleConfirmBooking = (newAppt: Appointment) => {
-    setAppointments((prev) => [newAppt, ...prev]);
-    setLookupPhone(newAppt.phone);
+    const matchedPro = professionals.find((p) => p.id === newAppt.proId);
+    const enrichedAppt: Appointment = {
+      ...newAppt,
+      profesionalUid: newAppt.profesionalUid || matchedPro?.linkedUid,
+    };
+
+    setAppointments((prev) => [enrichedAppt, ...prev]);
+    setLookupPhone(enrichedAppt.phone);
     showToast(
-      `Cita ${newAppt.code} confirmada para ${newAppt.client}. Comprobante listo para WhatsApp.`
+      `Cita ${enrichedAppt.code} confirmada para ${enrichedAppt.client}. Comprobante listo para WhatsApp.`
     );
+
+    if (enrichedAppt.venueId) {
+      setDoc(
+        doc(db, 'negocios', enrichedAppt.venueId, 'citas', enrichedAppt.id),
+        enrichedAppt
+      ).catch(() => {});
+    }
 
     // Persist to Cloud SQL / Offline Queue
     dispatchSyncAction(
       '/api/appointments',
       'POST',
-      newAppt,
-      `Cita ${newAppt.code} (${newAppt.client})`
+      enrichedAppt,
+      `Cita ${enrichedAppt.code} (${enrichedAppt.client})`
     );
   };
 
   const handleCancelAppointment = (id: string) => {
+    const found = appointments.find((a) => a.id === id);
     setAppointments((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status: 'Cancelada' } : a))
     );
     showToast('La cita ha sido cancelada y el horario quedó libre.');
+
+    if (activeBusiness) {
+      updateDoc(doc(db, 'negocios', activeBusiness.id, 'citas', id), {
+        status: 'Cancelada',
+      }).catch(() => {});
+      logActivity({
+        accion: 'Cita cancelada',
+        detalle: `Cita ${found?.code || id} de ${found?.client || 'cliente'} cancelada.`,
+        categoria: 'citas',
+      });
+    }
   };
 
-  // Business Management Handlers (Persisted to Cloud SQL / Offline Queue)
+  // Business Management Handlers (Persisted to Firestore & Cloud SQL)
   const handleSaveService = (svc: ServiceItem, isNew: boolean) => {
+    const previous = services.find((s) => s.id === svc.id);
     if (isNew) {
       setServices((prev) => [svc, ...prev]);
       showToast(`Servicio "${svc.name}" (${formatCOP(svc.price)}) creado.`);
@@ -521,6 +996,26 @@ export default function App() {
       showToast(
         `Servicio "${svc.name}" actualizado (${formatCOP(svc.price)}).`
       );
+    }
+
+    if (activeBusiness && userRole !== 'trabajador') {
+      setDoc(
+        doc(db, 'negocios', activeBusiness.id, 'servicios', svc.id),
+        svc
+      ).catch(() => {});
+
+      const priceChanged = previous && previous.price !== svc.price;
+      logActivity({
+        accion: isNew
+          ? 'Servicio creado'
+          : priceChanged
+            ? 'Cambio de precio de servicio'
+            : 'Servicio actualizado',
+        detalle: priceChanged
+          ? `"${svc.name}" cambió de ${formatCOP(previous.price)} a ${formatCOP(svc.price)}.`
+          : `"${svc.name}" (${formatCOP(svc.price)}).`,
+        categoria: 'servicios',
+      });
     }
 
     dispatchSyncAction(
@@ -541,6 +1036,19 @@ export default function App() {
           `Servicio "${s.name}" ${next ? 'activado' : 'pausado'} para clientes.`
         );
 
+        if (activeBusiness && userRole !== 'trabajador') {
+          setDoc(
+            doc(db, 'negocios', activeBusiness.id, 'servicios', updated.id),
+            updated,
+            { merge: true }
+          ).catch(() => {});
+          logActivity({
+            accion: next ? 'Servicio activado' : 'Servicio pausado',
+            detalle: `Servicio "${s.name}" marcado como ${next ? 'activo' : 'pausado'}.`,
+            categoria: 'servicios',
+          });
+        }
+
         dispatchSyncAction(
           '/api/services',
           'POST',
@@ -557,6 +1065,17 @@ export default function App() {
     const found = services.find((s) => s.id === id);
     setServices((prev) => prev.filter((s) => s.id !== id));
     if (found) showToast(`Servicio "${found.name}" eliminado.`);
+
+    if (activeBusiness && userRole !== 'trabajador') {
+      deleteDoc(doc(db, 'negocios', activeBusiness.id, 'servicios', id)).catch(
+        () => {}
+      );
+      logActivity({
+        accion: 'Servicio eliminado',
+        detalle: `Se eliminó el servicio "${found?.name || id}".`,
+        categoria: 'servicios',
+      });
+    }
 
     dispatchSyncAction(
       `/api/services/${id}`,
@@ -575,6 +1094,18 @@ export default function App() {
       showToast(`Perfil de ${pro.name} actualizado.`);
     }
 
+    if (activeBusiness && userRole !== 'trabajador') {
+      setDoc(
+        doc(db, 'negocios', activeBusiness.id, 'profesionales', pro.id),
+        pro
+      ).catch(() => {});
+      logActivity({
+        accion: isNew ? 'Especialista agregado' : 'Especialista actualizado',
+        detalle: `${pro.name} (${pro.role})`,
+        categoria: 'equipo',
+      });
+    }
+
     dispatchSyncAction(
       '/api/professionals',
       'POST',
@@ -588,6 +1119,17 @@ export default function App() {
     setProfessionals((prev) => prev.filter((p) => p.id !== id));
     if (found) showToast(`${found.name} eliminado del equipo.`);
 
+    if (activeBusiness && userRole !== 'trabajador') {
+      deleteDoc(
+        doc(db, 'negocios', activeBusiness.id, 'profesionales', id)
+      ).catch(() => {});
+      logActivity({
+        accion: 'Especialista eliminado',
+        detalle: `Se eliminó a ${found?.name || id} del equipo.`,
+        categoria: 'equipo',
+      });
+    }
+
     dispatchSyncAction(
       `/api/professionals/${id}`,
       'DELETE',
@@ -599,13 +1141,26 @@ export default function App() {
   const handleToggleWorkingDay = (day: DayName) => {
     setWorkingDays((prev) => {
       const nextOpen = !prev[day].isOpen;
-      showToast(
-        `${day}: marcado como ${nextOpen ? 'Abierto' : 'Cerrado para clientes'}.`
-      );
-      return {
+      const updated = {
         ...prev,
         [day]: { ...prev[day], isOpen: nextOpen },
       };
+      showToast(
+        `${day}: marcado como ${nextOpen ? 'Abierto' : 'Cerrado para clientes'}.`
+      );
+      if (activeBusiness && userRole !== 'trabajador') {
+        setDoc(
+          doc(db, 'negocios', activeBusiness.id, 'horarios', 'config'),
+          { workingDays: updated },
+          { merge: true }
+        ).catch(() => {});
+        logActivity({
+          accion: 'Horario laboral actualizado',
+          detalle: `${day} marcado como ${nextOpen ? 'Abierto' : 'Cerrado'}.`,
+          categoria: 'configuracion',
+        });
+      }
+      return updated;
     });
   };
 
@@ -614,10 +1169,25 @@ export default function App() {
     openTime: string,
     closeTime: string
   ) => {
-    setWorkingDays((prev) => ({
-      ...prev,
-      [day]: { ...prev[day], openTime, closeTime },
-    }));
+    setWorkingDays((prev) => {
+      const updated = {
+        ...prev,
+        [day]: { ...prev[day], openTime, closeTime },
+      };
+      if (activeBusiness && userRole !== 'trabajador') {
+        setDoc(
+          doc(db, 'negocios', activeBusiness.id, 'horarios', 'config'),
+          { workingDays: updated },
+          { merge: true }
+        ).catch(() => {});
+        logActivity({
+          accion: 'Horas de atención actualizadas',
+          detalle: `${day}: ${openTime} – ${closeTime}.`,
+          categoria: 'configuracion',
+        });
+      }
+      return updated;
+    });
     showToast(`Horario de ${day} actualizado (${openTime} – ${closeTime}).`);
   };
 
@@ -626,6 +1196,18 @@ export default function App() {
     showToast(
       `Bloqueo aplicado: ${block.day} de ${block.startTime} a ${block.endTime}.`
     );
+
+    if (activeBusiness && userRole !== 'trabajador') {
+      setDoc(
+        doc(db, 'negocios', activeBusiness.id, 'bloqueos', block.id),
+        block
+      ).catch(() => {});
+      logActivity({
+        accion: 'Bloqueo de horario creado',
+        detalle: `${block.day} ${block.startTime}-${block.endTime} (${block.proName}): ${block.reason}`,
+        categoria: 'configuracion',
+      });
+    }
 
     dispatchSyncAction(
       '/api/blocked-slots',
@@ -639,6 +1221,17 @@ export default function App() {
     setBlockedSlots((prev) => prev.filter((b) => b.id !== id));
     showToast('Bloqueo eliminado. Horarios disponibles nuevamente.');
 
+    if (activeBusiness && userRole !== 'trabajador') {
+      deleteDoc(doc(db, 'negocios', activeBusiness.id, 'bloqueos', id)).catch(
+        () => {}
+      );
+      logActivity({
+        accion: 'Bloqueo de horario eliminado',
+        detalle: `Se eliminó el bloqueo ${id}.`,
+        categoria: 'configuracion',
+      });
+    }
+
     dispatchSyncAction(
       `/api/blocked-slots/${id}`,
       'DELETE',
@@ -647,31 +1240,104 @@ export default function App() {
     );
   };
 
-  const handleSaveWhatsAppConfig = (cfg: WhatsAppConfig) => {
+  const handleSaveWhatsAppConfig = async (cfg: WhatsAppConfig) => {
+    if (userRole && userRole !== 'propietario') {
+      showToast('Solo el propietario puede guardar la configuración de WhatsApp.');
+      return;
+    }
     setWhatsAppConfig(cfg);
-    showToast('Configuración y plantilla de WhatsApp guardadas.');
 
-    dispatchSyncAction(
-      '/api/whatsapp-config',
-      'POST',
-      cfg,
-      'Configuración de WhatsApp'
-    );
+    if (user && (activeBusiness?.id || venues.length > 0)) {
+      try {
+        const businessId = activeBusiness?.id || venues[0].id;
+        const docRef = doc(db, 'negocios', businessId);
+        await setDoc(docRef, { whatsAppConfig: cfg }, { merge: true });
+        if (activeBusiness) {
+          refreshActiveBusinessDoc({ whatsAppConfig: cfg });
+          await logActivity({
+            accion: 'Configuración WhatsApp actualizada',
+            detalle: `Número oficial: ${cfg.businessPhone}`,
+            categoria: 'configuracion',
+          });
+        }
+        showToast('Guardado en la nube.');
+      } catch (err) {
+        console.error('Error saving config:', err);
+        showToast('Error al guardar en la nube.');
+      }
+    } else {
+      showToast('Configuración guardada localmente.');
+    }
   };
 
   const handleUpdateAppointmentStatus = (
     id: string,
     status: Appointment['status']
   ) => {
+    const targetAppt = appointments.find((a) => a.id === id);
     setAppointments((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status } : a))
     );
     showToast(`Estado de cita actualizado a ${status}.`);
+
+    if (activeBusiness) {
+      updateDoc(doc(db, 'negocios', activeBusiness.id, 'citas', id), {
+        status,
+      }).catch(() => {});
+      logActivity({
+        accion: `Cita marcada como ${status}`,
+        detalle: `Cita ${targetAppt?.code || id} de ${targetAppt?.client || 'cliente'} pasó a ${status}.`,
+        categoria: 'citas',
+      });
+    }
   };
 
-  const handleSelectPlan = (planId: SaasPlanId) => {
+  const handleUpdateAppointment = (id: string, updates: Partial<Appointment>) => {
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+    );
+
+    const appt = appointments.find((a) => a.id === id);
+    if (activeBusiness) {
+      updateDoc(
+        doc(db, 'negocios', activeBusiness.id, 'citas', id),
+        updates
+      ).catch(() => {});
+    }
+    if (appt) {
+      dispatchSyncAction(
+        '/api/appointments',
+        'POST',
+        { ...appt, ...updates },
+        `Actualizar cita ${appt.code}`
+      );
+    }
+  };
+
+  const handleSelectPlan = async (planId: SaasPlanId) => {
+    if (userRole && userRole !== 'propietario') {
+      showToast('Solo el propietario puede cambiar el plan.');
+      return;
+    }
     setActivePlan(planId);
-    showToast(`Suscripción actualizada al Plan ${planId.toUpperCase()}.`);
+    const limit = getPlanUserLimit(planId);
+    if (activeBusiness) {
+      try {
+        await updateDoc(doc(db, 'negocios', activeBusiness.id), {
+          plan: planId,
+          limiteUsuarios: limit,
+        });
+        refreshActiveBusinessDoc({ plan: planId, limiteUsuarios: limit });
+        await logActivity({
+          accion: 'Cambio de plan SaaS',
+          detalle: `Plan actualizado a ${getPlanDisplayName(planId)}.`,
+          categoria: 'plan',
+        });
+      } catch (err) {
+        console.warn('Error guardando plan en Firestore:', err);
+      }
+    }
+    showToast(`Suscripción actualizada al ${getPlanDisplayName(planId)}.`);
   };
 
   const handleUpdateVenue = (updatedVenue: Venue) => {
@@ -684,6 +1350,28 @@ export default function App() {
       }
     });
     showToast(`Negocio "${updatedVenue.name}" guardado correctamente.`);
+
+    if (activeBusiness && userRole === 'propietario' && updatedVenue.id === activeBusiness.id) {
+      setDoc(
+        doc(db, 'negocios', activeBusiness.id),
+        {
+          name: updatedVenue.name,
+          phone: updatedVenue.phone || '',
+          address: updatedVenue.address || '',
+          location: updatedVenue.location || '',
+          description: updatedVenue.description || '',
+          image: updatedVenue.image || '',
+          logo: updatedVenue.logo || '',
+          photos: updatedVenue.photos || [],
+        },
+        { merge: true }
+      ).catch(() => {});
+      logActivity({
+        accion: 'Información del local actualizada',
+        detalle: `Se actualizó el perfil de "${updatedVenue.name}".`,
+        categoria: 'configuracion',
+      });
+    }
 
     dispatchSyncAction(
       '/api/venues',
@@ -781,7 +1469,23 @@ export default function App() {
       label: 'Código QR de Reserva',
       icon: <QrCode className="w-4 h-4 shrink-0 text-indigo-400" />,
     },
+    {
+      id: 'access-team',
+      label: 'Equipo de acceso',
+      icon: <ShieldCheck className="w-4 h-4 shrink-0 text-champagne-500" />,
+      counter: teamMembers.length,
+    },
+    {
+      id: 'activity',
+      label: 'Actividad',
+      icon: <Activity className="w-4 h-4 shrink-0 text-emerald-400" />,
+      counter: activityLogs.length,
+    },
   ];
+
+  const visibleBusinessNavItems = businessNavItems.filter((item) =>
+    canAccessView(userRole || 'propietario', item.id)
+  );
 
   return (
     <div className="min-h-screen flex bg-sand-50 dark:bg-obsidian-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
@@ -923,7 +1627,7 @@ export default function App() {
                   </p>
                 )}
 
-                {businessNavItems.map((item) => {
+                {visibleBusinessNavItems.map((item) => {
                   const isActive = businessView === item.id;
                   return (
                     <button
@@ -970,15 +1674,28 @@ export default function App() {
               sidebarCollapsed ? 'justify-center' : ''
             }`}
           >
-            <div className="w-8 h-8 rounded-lg bg-champagne-500/15 text-champagne-600 dark:text-champagne-400 flex items-center justify-center shrink-0">
-              {user ? <User className="w-4 h-4" /> : <User className="w-4 h-4" />}
+            <div className="w-8 h-8 rounded-lg bg-champagne-500/15 text-champagne-600 dark:text-champagne-400 flex items-center justify-center shrink-0 font-bold text-xs">
+              {user ? (
+                (activeMember?.nombre || user.displayName || user.email || 'U')
+                  .charAt(0)
+                  .toUpperCase()
+              ) : (
+                <User className="w-4 h-4" />
+              )}
             </div>
             {!sidebarCollapsed && (
               <div className="min-w-0">
                 {user ? (
                   <>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.email}</p>
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium truncate">Sesión iniciada</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {activeMember?.nombre || user.displayName || user.email}
+                    </p>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium truncate">
+                      {activeBusiness?.name || activeMember?.negocioNombre || 'Sin negocio'}
+                    </p>
+                    <p className="text-[10px] text-champagne-600 dark:text-champagne-400 font-bold truncate">
+                      {userRole ? ROLE_LABELS[userRole] : 'Cuenta sin negocio'}
+                    </p>
                   </>
                 ) : (
                   <>
@@ -1122,7 +1839,27 @@ export default function App() {
         {/* Main Workspace Viewport (Compact padding) */}
         <main className="flex-1 p-3 sm:p-8 max-w-7xl w-full mx-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-full">Cargando...</div>
+            <div className="flex items-center justify-center h-full py-20 text-xs font-semibold text-slate-500">
+              Cargando...
+            </div>
+          ) : user && needsBusinessSelection && view !== 'inicio' ? (
+            <BusinessSelectorScreen
+              onSelect={async (negocioId) => {
+                await selectBusiness(negocioId);
+                setView('panel');
+                setRole('business');
+              }}
+              onLogout={handleLogoutBusiness}
+            />
+          ) : user && mustChangePassword && view !== 'inicio' ? (
+            <MustChangePasswordScreen
+              onSuccess={() => {
+                setView('panel');
+                setRole('business');
+                showToast('Contraseña actualizada. Bienvenido al panel.');
+              }}
+              onLogout={handleLogoutBusiness}
+            />
           ) : (
             <AnimatePresence mode="wait">
               {view === 'inicio' && (
@@ -1143,7 +1880,7 @@ export default function App() {
                   />
                 </motion.div>
               )}
-              {view === 'panel' && user && (
+              {view === 'panel' && user && activeBusiness && activeMember && (
                 <motion.div key="panel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <BusinessPanel
                     activeView={businessView}
@@ -1172,20 +1909,52 @@ export default function App() {
                     onAddBlockedSlot={handleAddBlockedSlot}
                     onRemoveBlockedSlot={handleRemoveBlockedSlot}
                     onUpdateAppointmentStatus={handleUpdateAppointmentStatus}
+                    onUpdateAppointment={handleUpdateAppointment}
                     onSelectPlan={handleSelectPlan}
                     onTestQrSplash={(v) => setQrSplashVenue(v)}
                     onShowToast={showToast}
+                    userRole={userRole}
+                    currentUserUid={user.uid}
+                    activeMember={activeMember}
+                    teamMembers={teamMembers}
+                    teamLoading={teamLoading}
+                    activityLogs={activityLogs}
+                    activityLoading={activityLoading}
+                    onCreateTeamMember={handleCreateTeamMember}
+                    onToggleMemberActive={handleToggleMemberActive}
+                    onChangeMemberRole={handleChangeMemberRole}
+                    onResetMemberPassword={handleResetMemberPassword}
+                    onRefreshActivity={() =>
+                      activeBusiness && fetchActivityLogs(activeBusiness.id)
+                    }
                   />
                 </motion.div>
               )}
               {view === 'login' && (
                 <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <AuthScreen onAuthenticated={() => navigateTo('panel')} />
+                  <AuthScreen
+                    onAuthenticated={() => {
+                      // AuthContext effect transitions automatically based on Firestore memberships
+                    }}
+                    onBackToHome={() => {
+                      setView('inicio');
+                      setRole('client');
+                    }}
+                  />
                 </motion.div>
               )}
-              {view === 'completar-negocio' && (
+              {view === 'completar-negocio' && user && (
                 <motion.div key="completar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <div className="flex items-center justify-center h-full">Completa tu negocio...</div>
+                  <CompleteBusinessScreen
+                    onBusinessCreated={async (_negId, name) => {
+                      await refreshSessionData();
+                      setView('panel');
+                      setRole('business');
+                      setBusinessView('dashboard');
+                      showToast(`¡Negocio "${name}" creado con éxito!`);
+                    }}
+                    onLogout={handleLogoutBusiness}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>

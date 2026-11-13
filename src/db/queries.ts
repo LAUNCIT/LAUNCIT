@@ -249,6 +249,7 @@ export async function getDbAppointments(): Promise<Appointment[]> {
     return rows.map((r) => ({
       id: r.id,
       code: r.code,
+      venueId: r.venueId,
       venueName: r.venueName,
       client: r.client,
       phone: r.phone,
@@ -263,6 +264,8 @@ export async function getDbAppointments(): Promise<Appointment[]> {
       time: r.time,
       price: r.price,
       status: r.status as any,
+      consentWhatsApp: r.consentWhatsApp || false,
+      reminderSent: r.reminderSent || false,
     }));
   } catch (error) {
     console.error('Failed to get appointments from Cloud SQL:', error);
@@ -277,6 +280,7 @@ export async function createDbAppointment(appt: Appointment): Promise<Appointmen
       .values({
         id: appt.id,
         code: appt.code,
+        venueId: appt.venueId,
         venueName: appt.venueName,
         client: appt.client,
         phone: appt.phone,
@@ -291,6 +295,8 @@ export async function createDbAppointment(appt: Appointment): Promise<Appointmen
         time: appt.time,
         price: appt.price,
         status: appt.status,
+        consentWhatsApp: appt.consentWhatsApp || false,
+        reminderSent: appt.reminderSent || false,
       })
       .returning();
 
@@ -298,6 +304,7 @@ export async function createDbAppointment(appt: Appointment): Promise<Appointmen
     return {
       id: r.id,
       code: r.code,
+      venueId: r.venueId,
       venueName: r.venueName,
       client: r.client,
       phone: r.phone,
@@ -312,6 +319,8 @@ export async function createDbAppointment(appt: Appointment): Promise<Appointmen
       time: r.time,
       price: r.price,
       status: r.status as any,
+      consentWhatsApp: r.consentWhatsApp || false,
+      reminderSent: r.reminderSent || false,
     };
   } catch (error) {
     console.error('Failed to create appointment in Cloud SQL:', error);

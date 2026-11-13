@@ -1,0 +1,151 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function memberDoc(negocioId) {
+      return get(/databases/$(database)/documents/negocios/$(negocioId)/miembros/$(request.auth.uid));
+    }
+
+    function hasMemberDoc(negocioId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/negocios/$(negocioId)/miembros/$(request.auth.uid));
+    }
+
+    function isActiveMember(negocioId) {
+      return hasMemberDoc(negocioId) &&
+        memberDoc(negocioId).data.activo == true;
+    }
+
+    function memberRole(negocioId) {
+      return memberDoc(negocioId).data.rol;
+    }
+
+    function isPropietario(negocioId) {
+      return isActiveMember(negocioId) && memberRole(negocioId) == 'propietario';
+    }
+
+    function isPropietarioOrAdmin(negocioId) {
+      return isActiveMember(negocioId) &&
+        (memberRole(negocioId) == 'propietario' || memberRole(negocioId) == 'administrador');
+    }
+
+    function isTrabajador(negocioId) {
+      return isActiveMember(negocioId) && memberRole(negocioId) == 'trabajador';
+    }
+
+    // Índice privado de membresías por usuario
+    match /usuarios/{uid}/membresias/{negocioId} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Regla para consultas collectionGroup('miembros') del usuario autenticado
+    match /{path=**}/miembros/{memberUid} {
+      allow read: if isSignedIn() &&
+        (resource.data.uid == request.auth.uid || memberUid == request.auth.uid);
+    }
+
+    match /negocios/{negocioId} {
+      // Cliente público (ver.html) puede leer datos públicos del negocio puntual
+      allow get: if true;
+      allow list: if isSignedIn();
+
+      // Al crear negocio nuevo, el usuario autenticado queda como ownerUid con plan gratis/básico (1 usuario)
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.plan in ['basico', 'gratis'] &&
+        request.resource.data.limiteUsuarios == 1;
+
+      // Solo el propietario puede modificar configuración del negocio, plan o pagos
+      allow update: if isPropietario(negocioId);
+      allow delete: if false;
+
+      // Miembros del negocio y roles
+      match /miembros/{memberUid} {
+        allow get: if isPropietario(negocioId) ||
+          (isSignedIn() && request.auth.uid == memberUid);
+        allow list: if isPropietario(negocioId);
+
+        // El propietario crea miembros nuevos; o el dueño inicial crea su propio registro de propietario al crear el negocio
+        allow create: if (isPropietario(negocioId) && memberUid != request.auth.uid) ||
+          (isSignedIn() &&
+            request.auth.uid == memberUid &&
+            get(/databases/$(database)/documents/negocios/$(negocioId)).data.ownerUid == request.auth.uid &&
+            request.resource.data.rol == 'propietario' &&
+            request.resource.data.activo == true);
+
+        // Solo el propietario puede cambiar roles o activar/desactivar a OTROS usuarios (nunca quitarse su propio rol).
+        // Un miembro activo únicamente puede marcar mustChangePassword = false en su propio primer ingreso.
+        allow update: if (isPropietario(negocioId) && memberUid != request.auth.uid) ||
+          (isActiveMember(negocioId) &&
+            request.auth.uid == memberUid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']) &&
+            request.resource.data.mustChangePassword == false);
+
+        allow delete: if isPropietario(negocioId) && memberUid != request.auth.uid;
+      }
+
+      // Servicios: públicos para lectura (ver.html); propietario y administrador escriben
+      match /servicios/{serviceId} {
+        allow read: if true;
+        allow write: if isPropietarioOrAdmin(negocioId);
+      }
+
+      // Horarios y bloqueos: públicos para lectura; propietario y administrador escriben
+      match /horarios/{horarioId} {
+        allow read: if true;
+        allow write: if isPropietarioOrAdmin(negocioId);
+      }
+
+      match /bloqueos/{blockId} {
+        allow read: if true;
+        allow write: if isPropietarioOrAdmin(negocioId);
+      }
+
+      // Especialistas: públicos para lectura; propietario y administrador escriben
+      match /profesionales/{proId} {
+        allow read: if true;
+        allow write: if isPropietarioOrAdmin(negocioId);
+      }
+
+      // Pagos SaaS del negocio: solo propietario
+      match /pagos/{pagoId} {
+        allow read, write: if isPropietario(negocioId);
+      }
+
+      // Citas / Reservas:
+      // - Cliente público (ver.html) SOLO puede crear citas (sin leer citas de otros clientes)
+      // - Propietario y administrador leen y administran toda la agenda
+      // - Trabajador SOLO lee citas donde profesionalUid == request.auth.uid y solo puede marcar status = 'Atendida'
+      match /citas/{citaId} {
+        allow read: if isPropietarioOrAdmin(negocioId) ||
+          (isTrabajador(negocioId) && resource.data.profesionalUid == request.auth.uid);
+
+        allow create: if (
+            request.resource.data.keys().hasAll(['client', 'service', 'status']) &&
+            request.resource.data.status == 'Confirmada'
+          ) || isPropietarioOrAdmin(negocioId);
+
+        allow update: if isPropietarioOrAdmin(negocioId) ||
+          (isTrabajador(negocioId) &&
+            resource.data.profesionalUid == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+            request.resource.data.status == 'Atendida');
+
+        allow delete: if isPropietarioOrAdmin(negocioId);
+      }
+
+      // Registro de actividad: visible únicamente para el propietario; inmutable
+      match /actividad/{actId} {
+        allow read: if isPropietario(negocioId);
+        allow create: if isActiveMember(negocioId) &&
+          request.resource.data.actorUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

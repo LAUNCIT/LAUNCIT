@@ -10,10 +10,12 @@ interface ContactFieldsProps {
   setEmail: (v: string) => void;
   notes: string;
   setNotes: (v: string) => void;
+  consent: boolean;
+  setConsent: (v: boolean) => void;
 }
 
 export const ContactFields: React.FC<ContactFieldsProps> = ({
-  name, setName, phone, setPhone, email, setEmail, notes, setNotes
+  name, setName, phone, setPhone, email, setEmail, notes, setNotes, consent, setConsent
 }) => {
   return (
     <div className="space-y-3.5 pt-3 border-t border-sand-200 dark:border-obsidian-800">
@@ -80,6 +82,23 @@ export const ContactFields: React.FC<ContactFieldsProps> = ({
             className="w-full pl-10 pr-3.5 py-2.5 rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 text-[16px] sm:text-sm focus:ring-2 focus:ring-champagne-500/20 focus:border-champagne-500 outline-none transition-all resize-none scroll-m-6"
           />
         </div>
+      </div>
+
+      <div className="pt-2">
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <div className="relative flex items-center h-5">
+            <input 
+              type="checkbox" 
+              required
+              checked={consent}
+              onChange={e => setConsent(e.target.checked)}
+              className="w-4 h-4 rounded border-sand-300 dark:border-obsidian-700 text-champagne-600 focus:ring-champagne-500/20 accent-champagne-500"
+            />
+          </div>
+          <span className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+            Acepto recibir confirmaciones y recordatorios de mi cita por WhatsApp o SMS *
+          </span>
+        </label>
       </div>
     </div>
   );

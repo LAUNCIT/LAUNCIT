@@ -148,6 +148,7 @@ export function compileWhatsAppMessage(
   template: string,
   appt?: Partial<Appointment>,
   customFallbacks?: Partial<{
+    venueId: string;
     venueName: string;
     client: string;
     service: string;
@@ -170,7 +171,7 @@ export function compileWhatsAppMessage(
   const venueStr = appt?.venueName || customFallbacks?.venueName || 'The Barber Club Flagship';
   const phoneStr = appt?.phone || customFallbacks?.phone || '+57 312 456 7890';
 
-  let priceStr = '$35.000 COP';
+  let priceStr = '$0 COP';
   if (appt?.price !== undefined) {
     priceStr = typeof appt.price === 'number' ? formatCOP(appt.price) : String(appt.price);
   } else if (customFallbacks?.price !== undefined) {
@@ -178,7 +179,11 @@ export function compileWhatsAppMessage(
   }
 
   const cleanPhone = cleanPhoneNumber(phoneStr);
-  const confirmationUrl = `https://glowcitas.com/reserva?codigo=${encodeURIComponent(codeStr)}&tel=${encodeURIComponent(cleanPhone)}`;
+  const venueId = appt?.venueId || customFallbacks?.venueId || 'default';
+  
+  // Real URL construction
+  const pathname = typeof window !== 'undefined' ? window.location.pathname.replace(/\/index\.html$/i, '').replace(/\/$/, '') : '';
+  const confirmationUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${pathname}/ver.html?negocio=${encodeURIComponent(venueId)}&codigo=${encodeURIComponent(codeStr)}`;
 
   const map: Record<string, string> = {
     cliente_nombre: clientName,

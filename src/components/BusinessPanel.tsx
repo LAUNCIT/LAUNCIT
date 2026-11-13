@@ -42,9 +42,13 @@ import {
   Box,
 } from 'lucide-react';
 import { QRCodeGenerator } from './QRCodeGenerator';
+import { AccessTeamSection } from './AccessTeamSection';
+import { ActivityLogSection } from './ActivityLogSection';
 import {
+  ActivityLogItem,
   Appointment,
   BlockedSlot,
+  BusinessMember,
   BusinessSubView,
   DayName,
   Professional,
@@ -54,10 +58,12 @@ import {
   ServiceItem,
   SmsConfig,
   SpecialistStatus,
+  UserRole,
   Venue,
   WhatsAppConfig,
   WorkingDayConfig,
 } from '../types';
+import { canAccessView } from '../utils/permissions';
 import {
   ALL_DAY_HOURS,
   BRAND_LOGO_FALLBACK,
@@ -69,6 +75,7 @@ import {
   SPECIALIST_PHOTO_PRESETS,
   SUBCATEGORY_LABELS,
   TIME_SLOTS,
+  UPCOMING_DATES,
   VENUE_PHOTO_PRESETS,
 } from '../data/initialData';
 import { formatCOP, parseTimeToMinutes } from '../utils/scheduleUtils';
@@ -78,13 +85,10 @@ import {
   generateWhatsAppUrl,
   WHATSAPP_PRESETS,
   WhatsAppPreset,
-  WhatsAppVariable,
 } from '../utils/whatsappUtils';
 import {
   getGlobalGlbUrl,
-  setGlobalGlbUrl,
   DEFAULT_GLOBAL_GLB,
-  FALLBACK_DEMO_GLB,
 } from '../config/arConfig';
 import { ResilientImage } from './ResilientImage';
 import { DailyRevenueTrendChart } from './DailyRevenueTrendChart';
@@ -123,9 +127,34 @@ interface BusinessPanelProps {
     id: string,
     status: Appointment['status']
   ) => void;
+  onUpdateAppointment?: (id: string, updates: Partial<Appointment>) => void;
   onSelectPlan: (planId: SaasPlanId) => void;
   onTestQrSplash?: (venue: Venue) => void;
   onShowToast: (msg: string) => void;
+  userRole?: UserRole | null;
+  currentUserUid?: string;
+  activeMember?: BusinessMember | null;
+  teamMembers?: BusinessMember[];
+  teamLoading?: boolean;
+  activityLogs?: ActivityLogItem[];
+  activityLoading?: boolean;
+  onCreateTeamMember?: (data: {
+    nombre: string;
+    email: string;
+    password: string;
+    rol: UserRole;
+    profesionalId?: string | null;
+    profesionalNombre?: string | null;
+  }) => Promise<void>;
+  onToggleMemberActive?: (member: BusinessMember) => Promise<void>;
+  onChangeMemberRole?: (
+    member: BusinessMember,
+    newRole: UserRole,
+    profesionalId?: string | null,
+    profesionalNombre?: string | null
+  ) => Promise<void>;
+  onResetMemberPassword?: (member: BusinessMember) => Promise<void>;
+  onRefreshActivity?: () => void;
 }
 
 export const BusinessPanel: React.FC<BusinessPanelProps> = ({
@@ -155,10 +184,26 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
   onAddBlockedSlot,
   onRemoveBlockedSlot,
   onUpdateAppointmentStatus,
+  onUpdateAppointment,
   onSelectPlan,
   onTestQrSplash,
   onShowToast,
+  userRole = 'propietario',
+  currentUserUid = '',
+  activeMember = null,
+  teamMembers = [],
+  teamLoading = false,
+  activityLogs = [],
+  activityLoading = false,
+  onCreateTeamMember,
+  onToggleMemberActive,
+  onChangeMemberRole,
+  onResetMemberPassword,
+  onRefreshActivity,
 }) => {
+  const effectiveRole: UserRole = userRole || 'propietario';
+  const isOwner = effectiveRole === 'propietario';
+  const isWorker = effectiveRole === 'trabajador';
   // Services Filter & Modal State
   const [svcSearch, setSvcSearch] = useState('');
   const [svcCatFilter, setSvcCatFilter] = useState<'all' | ServiceCategory>(
@@ -432,10 +477,25 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
     });
   };
 
+  const visibleAppointments = useMemo(() => {
+    if (!isWorker) return appointments;
+    const myUid = currentUserUid || activeMember?.uid;
+    const myProId = activeMember?.profesionalId;
+    return appointments.filter(
+      (a) =>
+        (myUid && a.profesionalUid === myUid) ||
+        (myProId && a.proId === myProId)
+    );
+  }, [appointments, isWorker, currentUserUid, activeMember?.uid, activeMember?.profesionalId]);
+
+  const effectiveAgendaProFilter = isWorker
+    ? activeMember?.profesionalId || 'all'
+    : agendaProFilter;
+
   // Metrics
   const activeAppointments = useMemo(
-    () => appointments.filter((a) => a.status !== 'Cancelada'),
-    [appointments]
+    () => visibleAppointments.filter((a) => a.status !== 'Cancelada'),
+    [visibleAppointments]
   );
 
   // Confirmed monthly revenue metrics (accumulated from confirmed appointments)
@@ -723,6 +783,31 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
     onAddBlockedSlot(newBlock);
     setBlockReason('');
   };
+
+  if (!canAccessView(effectiveRole, activeView)) {
+    return (
+      <div className="p-8 sm:p-10 rounded-2xl bg-white dark:bg-obsidian-900 border border-rose-500/30 text-center space-y-4 max-w-lg mx-auto my-8 shadow-xl">
+        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+          <Lock className="w-6 h-6" />
+        </div>
+        <div className="space-y-1.5">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            No tienes permiso para ver esta sección
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Tu rol actual no tiene autorización para acceder a esta pantalla del panel.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChangeView(isWorker ? 'calendar' : 'dashboard')}
+          className="px-5 py-2.5 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-extrabold text-xs transition-colors"
+        >
+          Volver a mi vista permitida
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -1050,18 +1135,47 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${
-                        appt.status === 'Confirmada'
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                          : appt.status === 'Completada'
-                            ? 'bg-champagne-500/15 text-champagne-600 dark:text-champagne-400'
-                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                      }`}
-                    >
-                      {appt.status}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 mr-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const msg = compileWhatsAppMessage(waConfig.confirmationTemplate, appt);
+                            const url = generateWhatsAppUrl(appt.phone, msg);
+                            window.open(url, '_blank');
+                            if (onUpdateAppointment) onUpdateAppointment(appt.id, { reminderSent: true });
+                          }}
+                          title="Enviar confirmación por WhatsApp"
+                          className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const msg = compileWhatsAppMessage(waConfig.reminder24hTemplate, appt);
+                            const url = generateWhatsAppUrl(appt.phone, msg);
+                            window.open(url, '_blank');
+                            if (onUpdateAppointment) onUpdateAppointment(appt.id, { reminderSent: true });
+                          }}
+                          title="Enviar recordatorio por WhatsApp"
+                          className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all"
+                        >
+                          <Clock className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${
+                          appt.status === 'Confirmada'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                            : appt.status === 'Atendida' || appt.status === 'Completada'
+                              ? 'bg-champagne-500/15 text-champagne-600 dark:text-champagne-400'
+                              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {appt.status}
+                      </span>
 
                     {appt.status === 'Confirmada' && (
                       <>
@@ -1099,37 +1213,109 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                Agenda General del Negocio
+                {isWorker
+                  ? `Mi Agenda${activeMember?.profesionalNombre ? ` — ${activeMember.profesionalNombre}` : ''}`
+                  : 'Agenda General del Negocio'}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Visualiza días cerrados, bloqueos aplicados y citas activas que limitan automáticamente las opciones del cliente.
+                {isWorker
+                  ? 'Consulta tus citas asignadas y márcalas como atendidas al finalizar el servicio.'
+                  : 'Visualiza días cerrados, bloqueos aplicados y citas activas que limitan automáticamente las opciones del cliente.'}
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0">
-              <select
-                aria-label="Filtrar agenda por especialista"
-                value={agendaProFilter}
-                onChange={(e) => setAgendaProFilter(e.target.value)}
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-champagne-500"
-              >
-                <option value="all">Todo el Equipo</option>
-                {professionals.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.role})
-                  </option>
-                ))}
-              </select>
+            {!isWorker && (
+              <div className="flex items-center gap-2.5 shrink-0">
+                <select
+                  aria-label="Filtrar agenda por especialista"
+                  value={agendaProFilter}
+                  onChange={(e) => setAgendaProFilter(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-champagne-500"
+                >
+                  <option value="all">Todo el Equipo</option>
+                  {professionals.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.role})
+                    </option>
+                  ))}
+                </select>
 
-              <button
-                type="button"
-                onClick={() => onChangeView('schedule')}
-                className="px-3.5 py-2 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-extrabold text-xs transition-colors whitespace-nowrap"
-              >
-                Editar Horarios / Bloqueos
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => onChangeView('schedule')}
+                  className="px-3.5 py-2 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-extrabold text-xs transition-colors whitespace-nowrap"
+                >
+                  Editar Horarios / Bloqueos
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Lista rápida de citas para el Trabajador */}
+          {isWorker && (
+            <div className="rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-sand-200 dark:border-obsidian-800 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Mis citas asignadas ({visibleAppointments.length})
+                </h3>
+              </div>
+              {visibleAppointments.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  No tienes citas asignadas por el momento.
+                </div>
+              ) : (
+                <div className="divide-y divide-sand-200 dark:divide-obsidian-800">
+                  {visibleAppointments.map((appt) => (
+                    <div
+                      key={appt.id}
+                      className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-mono font-bold text-champagne-600 dark:text-champagne-400">
+                            {appt.code}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {appt.client}
+                          </span>
+                          <span className="text-slate-400 font-mono">{appt.phone}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          {appt.service} · {appt.dateKey} {appt.time}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
+                            appt.status === 'Confirmada'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                              : appt.status === 'Atendida' || appt.status === 'Completada'
+                                ? 'bg-champagne-500/15 text-champagne-600 dark:text-champagne-400'
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                          }`}
+                        >
+                          {appt.status}
+                        </span>
+
+                        {appt.status === 'Confirmada' && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateAppointmentStatus(appt.id, 'Atendida')
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-champagne-500 hover:bg-champagne-400 text-slate-950 text-xs font-extrabold transition-colors whitespace-nowrap"
+                          >
+                            Marcar como Atendida
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {inspectedAppt && (
             <div className="p-5 rounded-[24px] bg-white dark:bg-obsidian-900 border border-champagne-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-champagne-500/5">
@@ -1142,8 +1328,12 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                   <span className="font-bold text-slate-700 dark:text-slate-200">{inspectedAppt.service}</span>
                   <span>·</span>
                   <span>{inspectedAppt.dateKey} {inspectedAppt.time}</span>
-                  <span>·</span>
-                  <span className="font-mono text-champagne-600 font-bold">{formatCOP(inspectedAppt.price)}</span>
+                  {!isWorker && (
+                    <>
+                      <span>·</span>
+                      <span className="font-mono text-champagne-600 font-bold">{formatCOP(inspectedAppt.price)}</span>
+                    </>
+                  )}
                 </div>
                 {/* Specialized details in inspector */}
                 {(inspectedAppt.engineType === 'accommodation' || inspectedAppt.engineType === 'rental' || inspectedAppt.engineType === 'restaurant') && (
@@ -1153,6 +1343,53 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                     {inspectedAppt.engineType === 'restaurant' && `Zona: ${inspectedAppt.zone} · Comensales: ${inspectedAppt.guestsCount}`}
                   </p>
                 )}
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  {inspectedAppt.status === 'Confirmada' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateAppointmentStatus(inspectedAppt.id, 'Atendida');
+                        setInspectedAppt((prev) =>
+                          prev ? { ...prev, status: 'Atendida' } : null
+                        );
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 text-[11px] font-extrabold flex items-center gap-1.5 transition-all shadow-sm"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Marcar como Atendida</span>
+                    </button>
+                  )}
+                  {!isWorker && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const msg = compileWhatsAppMessage(waConfig.confirmationTemplate, inspectedAppt);
+                          const url = generateWhatsAppUrl(inspectedAppt.phone, msg);
+                          window.open(url, '_blank');
+                          if (onUpdateAppointment) onUpdateAppointment(inspectedAppt.id, { reminderSent: true });
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-2 transition-all shadow-sm"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Confirmar WA</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const msg = compileWhatsAppMessage(waConfig.reminder24hTemplate, inspectedAppt);
+                          const url = generateWhatsAppUrl(inspectedAppt.phone, msg);
+                          window.open(url, '_blank');
+                          if (onUpdateAppointment) onUpdateAppointment(inspectedAppt.id, { reminderSent: true });
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-2 transition-all shadow-sm"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Recordar WA</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               <button
                 type="button"
@@ -1224,9 +1461,9 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                         const matchingBlock = blockedSlots.find((b) => {
                           if (b.day !== day) return false;
                           if (
-                            agendaProFilter !== 'all' &&
+                            effectiveAgendaProFilter !== 'all' &&
                             b.proId !== 'all' &&
-                            b.proId !== agendaProFilter
+                            b.proId !== effectiveAgendaProFilter
                           ) {
                             return false;
                           }
@@ -1258,8 +1495,9 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                           (a) =>
                             a.dayName === day &&
                             a.time === slot &&
-                            (agendaProFilter === 'all' ||
-                              a.proId === agendaProFilter)
+                            (isWorker ||
+                              effectiveAgendaProFilter === 'all' ||
+                              a.proId === effectiveAgendaProFilter)
                         );
 
                         if (matchingAppt) {
@@ -2672,41 +2910,44 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
             {[
               {
                 id: 'basico' as SaasPlanId,
-                name: 'Plan Básico',
+                name: 'Plan Gratis',
                 audience: 'Para profesionales independientes',
                 monthlyPrice: 0,
                 features: [
-                  '1 especialista activo',
+                  '1 usuario en Equipo de acceso',
                   'Hasta 40 reservas mensuales',
                   'Reserva cliente sin registro en 4 pasos',
                 ],
               },
               {
-                id: 'pro' as SaasPlanId,
-                name: 'Plan Pro',
+                id: 'intermedio' as SaasPlanId,
+                name: 'Plan Intermedio',
                 audience: 'Para barberías, spas y salones en crecimiento',
                 monthlyPrice: 49000,
                 features: [
+                  'Hasta 3 usuarios en Equipo de acceso',
                   'Reservas y clientes ilimitados',
-                  'Hasta 10 especialistas en equipo',
                   'Calendario inteligente con bloqueos horarios',
-                  'Confirmaciones automáticas por WhatsApp',
+                  'Plantillas de confirmación por WhatsApp',
                   'Burbuja con logo animado al escanear con LAUNCIT',
                 ],
               },
               {
-                id: 'elite' as SaasPlanId,
-                name: 'Plan Élite',
+                id: 'pro' as SaasPlanId,
+                name: 'Plan Pro',
                 audience: 'Para clínicas estéticas y múltiples sedes',
                 monthlyPrice: 99000,
                 features: [
-                  'Especialistas y sedes ilimitadas',
-                  'Recordatorios SMS + WhatsApp bidireccional',
-                  'Reportes financieros y soporte prioritario',
+                  'Hasta 5 usuarios en Equipo de acceso',
+                  'Registro de actividad y control de roles',
+                  'Recordatorios WhatsApp + soporte prioritario',
                 ],
               },
             ].map((plan) => {
-              const isCurrent = activePlan === plan.id;
+              const isCurrent =
+                activePlan === plan.id ||
+                (plan.id === 'basico' && activePlan === 'gratis') ||
+                (plan.id === 'pro' && activePlan === 'elite');
               const finalPrice = annualBilling
                 ? Math.round(plan.monthlyPrice * 0.8)
                 : plan.monthlyPrice;
@@ -3022,31 +3263,49 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                       </label>
                     </div>
                   </div>
+
+                  <div className="pt-3 border-t border-sand-200 dark:border-obsidian-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                        <span>Envío Automático (API)</span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase tracking-wider">Próximamente</span>
+                      </label>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      La función de envío automático sin intervención manual requiere una integración con la API oficial de WhatsApp Business (Meta) y una suscripción Elite. 
+                    </p>
+                  </div>
                 </div>
 
                 {/* Save and Reset Bar */}
-                <div className="pt-4 border-t border-sand-200 dark:border-obsidian-800 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setWaConfig(DEFAULT_WHATSAPP_CONFIG);
-                      onShowToast('Plantilla restablecida a valores por defecto.');
-                    }}
-                    className="px-4 py-2.5 rounded-xl border border-sand-300 dark:border-obsidian-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Restablecer</span>
-                  </button>
+                {!isOwner ? (
+                  <div className="pt-4 border-t border-sand-200 dark:border-obsidian-800 text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                    Solo el propietario puede modificar y guardar las plantillas o el número oficial. Puedes usar los botones de envío manual y prueba.
+                  </div>
+                ) : (
+                  <div className="pt-4 border-t border-sand-200 dark:border-obsidian-800 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWaConfig(DEFAULT_WHATSAPP_CONFIG);
+                        onShowToast('Plantilla restablecida a valores por defecto.');
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-sand-300 dark:border-obsidian-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Restablecer</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={handleSaveWhatsAppConfig}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition-colors flex items-center gap-2 shadow-sm shadow-emerald-950/30"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Guardar Configuración</span>
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveWhatsAppConfig}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition-colors flex items-center gap-2 shadow-sm shadow-emerald-950/30"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Guardar Configuración</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3323,260 +3582,101 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                   <MessageSquare className="w-5 h-5" />
                 </span>
                 <span className="text-xs font-bold uppercase tracking-wider text-champagne-400">
-                  Módulo de Notificaciones SMS &amp; Alertas
+                  Recordatorios WA / SMS
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Gestor de Recordatorios Automáticos por SMS
+                Gestión de Recordatorios Manuales
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
-                Configura la pasarela SMS (Twilio, AWS SNS o Simulación API Gateway) y edita plantillas dinámicas con variables en tiempo real para reducir el Ausentismo (No-Show).
+                Envía recordatorios personalizados a tus clientes por WhatsApp. Las notificaciones automáticas y SMS estarán disponibles próximamente.
               </p>
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0 self-start md:self-auto bg-sand-100 dark:bg-obsidian-850 p-2.5 rounded-xl border border-sand-200 dark:border-obsidian-750">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Gateway SMS:
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !localSmsConfig.enabled;
-                  const updated = { ...localSmsConfig, enabled: next };
-                  setLocalSmsConfig(updated);
-                  if (onSaveSmsConfig) onSaveSmsConfig(updated);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-colors flex items-center gap-1.5 ${
-                  localSmsConfig.enabled
-                    ? 'bg-champagne-500 text-slate-950'
-                    : 'bg-slate-300 dark:bg-obsidian-700 text-slate-700 dark:text-slate-400'
-                }`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    localSmsConfig.enabled ? 'bg-slate-950 animate-pulse' : 'bg-slate-500'
-                  }`}
-                />
-                <span>{localSmsConfig.enabled ? 'SMS Habilitado' : 'Pausado'}</span>
-              </button>
             </div>
           </div>
 
-          {/* Main 2-Column SMS Workspace */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Settings & Template Editor (7 cols) */}
-            <div className="lg:col-span-7 space-y-5">
-              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 space-y-4">
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2 border-b border-sand-200 dark:border-obsidian-800 pb-3">
-                  <Smartphone className="w-4 h-4 text-champagne-500" />
-                  <span>Configuración del Proveedor SMS &amp; Parámetros</span>
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Proveedor Gateway SMS
-                    </label>
-                    <select
-                      aria-label="Proveedor Gateway SMS"
-                      value={localSmsConfig.gatewayProvider}
-                      onChange={(e) =>
-                        setLocalSmsConfig((prev) => ({
-                          ...prev,
-                          gatewayProvider: e.target.value as any,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-xl bg-sand-100 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-750 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-champagne-500"
-                    >
-                      <option value="twilio">Twilio Messaging API (Global)</option>
-                      <option value="aws_sns">AWS SNS SMS (High Volume)</option>
-                      <option value="simulated">Simulador Integrado Glow (Demostración)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Encabezado del Remitente (Sender Header)
-                    </label>
-                    <input
-                      type="text"
-                      value={localSmsConfig.senderHeader}
-                      onChange={(e) =>
-                        setLocalSmsConfig((prev) => ({
-                          ...prev,
-                          senderHeader: e.target.value,
-                        }))
-                      }
-                      placeholder="GlowCitas"
-                      className="w-full px-3 py-2 rounded-xl bg-sand-100 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-750 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-champagne-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2 border-t border-sand-200 dark:border-obsidian-800 pt-3 text-xs">
-                  <h4 className="font-bold text-slate-800 dark:text-slate-200">
-                    Reglas de Disparo Automático
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-750 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={localSmsConfig.reminder24hEnabled}
-                        onChange={(e) =>
-                          setLocalSmsConfig((prev) => ({
-                            ...prev,
-                            reminder24hEnabled: e.target.checked,
-                          }))
-                        }
-                        className="w-4 h-4 accent-champagne-500 shrink-0"
-                      />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        SMS 24 horas antes de la cita
+            {/* Recordatorios por enviar */}
+            <div className="lg:col-span-8 space-y-6">
+              {[
+                { title: 'Citas para Hoy', date: UPCOMING_DATES[0]?.dateKey },
+                { title: 'Citas para Mañana', date: UPCOMING_DATES[1]?.dateKey }
+              ].map((section) => {
+                const filtered = appointments.filter(a => a.dateKey === section.date && a.status === 'Confirmada');
+                return (
+                  <div key={section.title} className="bg-white dark:bg-obsidian-900 rounded-2xl border border-sand-200 dark:border-obsidian-800 overflow-hidden shadow-sm">
+                    <div className="px-5 py-3.5 border-b border-sand-200 dark:border-obsidian-800 bg-sand-50 dark:bg-obsidian-850/50 flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        {section.title} 
+                        <span className="text-[10px] font-mono opacity-50">({section.date})</span>
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full bg-sand-200 dark:bg-obsidian-800 text-[10px] font-bold text-slate-500 tabular-nums">
+                        {filtered.length} pendientes
                       </span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-750 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={localSmsConfig.reminder2hEnabled}
-                        onChange={(e) =>
-                          setLocalSmsConfig((prev) => ({
-                            ...prev,
-                            reminder2hEnabled: e.target.checked,
-                          }))
-                        }
-                        className="w-4 h-4 accent-champagne-500 shrink-0"
-                      />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        SMS 2 horas antes (Recordatorio exprés)
-                      </span>
-                    </label>
+                    </div>
+                    <div className="divide-y divide-sand-200 dark:divide-obsidian-800">
+                      {filtered.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-xs italic">
+                          No hay citas confirmadas para esta fecha.
+                        </div>
+                      ) : (
+                        filtered.map((appt) => (
+                          <div key={appt.id} className="p-4 flex items-center justify-between gap-4 hover:bg-sand-50 dark:hover:bg-obsidian-850/30 transition-colors">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{appt.client}</p>
+                              <p className="text-[10px] text-slate-500 font-medium truncate">{appt.time} · {appt.service}</p>
+                              {appt.reminderSent && (
+                                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 mt-0.5">
+                                  <CheckCheck className="w-3 h-3" /> Recordatorio enviado
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const msg = compileWhatsAppMessage(waConfig.reminder24hTemplate, appt);
+                                const url = generateWhatsAppUrl(appt.phone, msg);
+                                window.open(url, '_blank');
+                                if (onUpdateAppointment) onUpdateAppointment(appt.id, { reminderSent: true });
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1.5 transition-all shrink-0 shadow-sm"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                              <span>Recordar</span>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* Editor de Plantilla SMS */}
-                <div className="space-y-3 border-t border-sand-200 dark:border-obsidian-800 pt-4 text-xs">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800 dark:text-slate-200">
-                      Editor de Plantilla SMS
-                    </label>
-                    <span className="font-mono text-[11px] text-champagne-400 font-bold">
-                      {localSmsConfig.smsTemplate.length} / 160 caracteres ·{' '}
-                      {Math.ceil(localSmsConfig.smsTemplate.length / 160) || 1} segmento SMS
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-sand-50 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-750">
-                    {[
-                      { tag: '{{cliente_nombre}}', label: '+ Cliente' },
-                      { tag: '{{servicio}}', label: '+ Servicio' },
-                      { tag: '{{fecha}}', label: '+ Fecha' },
-                      { tag: '{{hora}}', label: '+ Hora' },
-                      { tag: '{{codigo}}', label: '+ Código' },
-                      { tag: '{{local}}', label: '+ Local' },
-                    ].map((btn) => (
-                      <button
-                        key={btn.tag}
-                        type="button"
-                        onClick={() => {
-                          const textarea = smsTextareaRef.current;
-                          const cur = localSmsConfig.smsTemplate;
-                          if (!textarea) {
-                            setLocalSmsConfig((prev) => ({
-                              ...prev,
-                              smsTemplate: cur + ' ' + btn.tag,
-                            }));
-                            return;
-                          }
-                          const start = textarea.selectionStart ?? cur.length;
-                          const end = textarea.selectionEnd ?? cur.length;
-                          const next =
-                            cur.substring(0, start) +
-                            btn.tag +
-                            cur.substring(end);
-                          setLocalSmsConfig((prev) => ({
-                            ...prev,
-                            smsTemplate: next,
-                          }));
-                        }}
-                        className="px-2 py-1 rounded bg-white dark:bg-obsidian-800 border border-sand-200 dark:border-obsidian-700 hover:border-champagne-500 font-mono text-[11px] text-slate-800 dark:text-slate-200 transition-colors"
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <textarea
-                    ref={smsTextareaRef}
-                    rows={4}
-                    value={localSmsConfig.smsTemplate}
-                    onChange={(e) =>
-                      setLocalSmsConfig((prev) => ({
-                        ...prev,
-                        smsTemplate: e.target.value,
-                      }))
-                    }
-                    placeholder="Recordatorio: {{cliente_nombre}}, tu cita de {{servicio}} en {{local}} es el {{fecha}} a las {{hora}}. Código: {{codigo}}."
-                    className="w-full p-3 rounded-xl bg-sand-100 dark:bg-obsidian-850 border border-sand-200 dark:border-obsidian-750 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-champagne-500"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-sand-200 dark:border-obsidian-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onSaveSmsConfig) onSaveSmsConfig(localSmsConfig);
-                      onShowToast('Simulación de envío SMS realizada con éxito.');
-                    }}
-                    className="px-3.5 py-2 rounded-xl border border-sand-200 dark:border-obsidian-750 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-champagne-500 flex items-center gap-1.5"
-                  >
-                    <Send className="w-3.5 h-3.5 text-champagne-400" />
-                    <span>Probar Envío SMS</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onSaveSmsConfig) onSaveSmsConfig(localSmsConfig);
-                    }}
-                    className="px-5 py-2 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-extrabold text-xs transition-colors flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Guardar Plantilla SMS</span>
-                  </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
 
-            {/* Right Column: Smartphone SMS Live Preview (5 cols) */}
-            <div className="lg:col-span-5 space-y-5">
-              <div className="rounded-3xl border-4 border-slate-800 dark:border-obsidian-750 bg-slate-950 shadow-2xl p-4 text-white space-y-3">
-                <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
-                  <span className="font-mono">Mensajes SMS</span>
-                  <span className="font-bold text-champagne-400">
-                    Remitente: {localSmsConfig.senderHeader || 'GlowCitas'}
-                  </span>
+            {/* Configuración SMS (Próximamente) */}
+            <div className="lg:col-span-4 relative">
+              <div className="p-5 rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 space-y-4 shadow-sm opacity-50 blur-[1px] pointer-events-none">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2 border-b border-sand-200 dark:border-obsidian-800 pb-3">
+                  <Smartphone className="w-4 h-4 text-champagne-500" />
+                  <span>Configuración SMS Business</span>
+                </h3>
+                <div className="space-y-3">
+                  <div className="h-8 bg-sand-100 dark:bg-obsidian-850 rounded-lg w-full" />
+                  <div className="h-8 bg-sand-100 dark:bg-obsidian-850 rounded-lg w-full" />
+                  <div className="h-24 bg-sand-100 dark:bg-obsidian-850 rounded-lg w-full" />
                 </div>
-
-                <div className="py-4 space-y-3 min-h-[220px]">
-                  <div className="p-3.5 rounded-2xl bg-slate-800 text-xs space-y-1 max-w-[90%] font-sans leading-relaxed border border-slate-700 shadow-md">
-                    <p className="text-[10px] text-slate-400 font-mono font-bold">
-                      SMS · Ahora
-                    </p>
-                    <p className="text-slate-100">
-                      {localSmsConfig.smsTemplate
-                        .replace(/\{\{cliente_nombre\}\}/g, 'Carlos Mendoza')
-                        .replace(/\{\{servicio\}\}/g, 'Corte Fade Pro & Asesoría')
-                        .replace(/\{\{fecha\}\}/g, 'Mar, 10 Nov')
-                        .replace(/\{\{hora\}\}/g, '10:00 AM')
-                        .replace(/\{\{codigo\}\}/g, 'GLW-4091')
-                        .replace(/\{\{local\}\}/g, currentVenue?.name || 'Glow Studio')}
+              </div>
+              
+              <div className="absolute inset-0 flex items-center justify-center p-6 z-10">
+                <div className="p-6 rounded-3xl bg-obsidian-900/90 border border-champagne-500/50 backdrop-blur-md shadow-2xl text-center space-y-3 max-w-[240px]">
+                  <div className="w-12 h-12 bg-champagne-500/20 rounded-2xl flex items-center justify-center mx-auto">
+                    <Sparkles className="w-6 h-6 text-champagne-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-sm">Próximamente</h4>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      El envío automático y notificaciones SMS requieren una suscripción Elite. Estamos trabajando en ello.
                     </p>
                   </div>
-                </div>
-
-                <div className="text-[10px] text-slate-500 text-center font-mono">
-                  Vista previa interactiva de pantalla SMS para clientes
                 </div>
               </div>
             </div>
@@ -3865,6 +3965,45 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
           </div>
 
         </div>
+      )}
+
+      {/* 10. EQUIPO DE ACCESO (SOLO PROPIETARIO) */}
+      {activeView === 'access-team' && (
+        <AccessTeamSection
+          currentUserUid={currentUserUid}
+          activePlan={activePlan}
+          members={teamMembers}
+          professionals={professionals}
+          loading={teamLoading}
+          onCreateMember={
+            onCreateTeamMember ||
+            (async () => {
+              onShowToast('Función no disponible en modo demo.');
+            })
+          }
+          onToggleMemberActive={
+            onToggleMemberActive ||
+            (async () => {})
+          }
+          onChangeMemberRole={
+            onChangeMemberRole ||
+            (async () => {})
+          }
+          onResetMemberPassword={
+            onResetMemberPassword ||
+            (async () => {})
+          }
+          onGoToPricing={() => onChangeView('pricing')}
+        />
+      )}
+
+      {/* 11. REGISTRO DE ACTIVIDAD (SOLO PROPIETARIO) */}
+      {activeView === 'activity' && (
+        <ActivityLogSection
+          logs={activityLogs}
+          loading={activityLoading}
+          onRefresh={onRefreshActivity || (() => {})}
+        />
       )}
 
       {/* MODAL CREAR / EDITAR SERVICIO */}

@@ -34,6 +34,7 @@ export const RestaurantFlow: React.FC<FlowProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [consentWhatsApp, setConsentWhatsApp] = useState(false);
 
   const handleNext = () => {
     if (step === 1 && selectedZone) setStep(2);
@@ -59,6 +60,8 @@ export const RestaurantFlow: React.FC<FlowProps> = ({
       phone: clientPhone,
       email: clientEmail,
       notes: clientNotes,
+      venueId: venue.id,
+      consentWhatsApp,
       service: `Reserva de Mesa - ${guests} pers.`,
       price: 0,
     };
@@ -182,7 +185,13 @@ export const RestaurantFlow: React.FC<FlowProps> = ({
                 </div>
               </div>
 
-              <ContactFields name={clientName} setName={setClientName} phone={clientPhone} setPhone={setClientPhone} email={clientEmail} setEmail={setClientEmail} notes={clientNotes} setNotes={setClientNotes} />
+              <ContactFields 
+                name={clientName} setName={setClientName} 
+                phone={clientPhone} setPhone={setClientPhone} 
+                email={clientEmail} setEmail={setClientEmail} 
+                notes={clientNotes} setNotes={setClientNotes}
+                consent={consentWhatsApp} setConsent={setConsentWhatsApp}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -199,7 +208,7 @@ export const RestaurantFlow: React.FC<FlowProps> = ({
         </button>
         <button 
           onClick={step === 4 ? confirmBooking : handleNext} 
-          disabled={(step === 1 && !selectedZone) || (step === 2 && !selectedTime) || (step === 4 && (!clientName || !clientPhone))} 
+          disabled={(step === 1 && !selectedZone) || (step === 2 && !selectedTime) || (step === 4 && (!clientName || !clientPhone || !consentWhatsApp))} 
           className="flex-1 max-w-xs px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 disabled:opacity-40 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 min-h-[44px]"
         >
           <span>{step === 4 ? 'Confirmar Reserva' : 'Continuar'}</span>

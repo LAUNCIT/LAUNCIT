@@ -29,6 +29,7 @@ export const AccommodationFlow: React.FC<FlowProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [consentWhatsApp, setConsentWhatsApp] = useState(false);
 
   const extraServices = services.filter(s => s.isActive && s.category === venue.category && (s.name.toLowerCase().includes('extra') || s.name.toLowerCase().includes('bbq') || s.name.toLowerCase().includes('piscina')));
   
@@ -57,10 +58,11 @@ export const AccommodationFlow: React.FC<FlowProps> = ({
   };
 
   const confirmBooking = () => {
-    if (!clientName || !clientPhone) return;
+    if (!clientName || !clientPhone || !consentWhatsApp) return;
     const apptData: Partial<Appointment> = {
       engineType: 'accommodation',
       subCategory: venue.subCategory,
+      venueId: venue.id,
       service: `Estadía en ${venue.name}`,
       dateKey: checkIn,
       checkInDate: checkIn,
@@ -72,6 +74,7 @@ export const AccommodationFlow: React.FC<FlowProps> = ({
       client: clientName,
       phone: clientPhone,
       email: clientEmail,
+      consentWhatsApp: true,
       notes: clientNotes,
     };
     onConfirm(apptData);
@@ -84,7 +87,7 @@ export const AccommodationFlow: React.FC<FlowProps> = ({
           <span className="text-[10px] font-bold text-champagne-600 uppercase tracking-widest">Paso {step} de 4</span>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Alojamiento</span>
         </div>
-        <div className="h-1 bg-sand-200 dark:bg-obsidian-800 rounded-full overflow-hidden">
+        <div className="h-1 bg-sand-200 dark:border-obsidian-800 rounded-full overflow-hidden">
           <motion.div className="h-full bg-champagne-500" initial={{ width: 0 }} animate={{ width: `${(step / 4) * 100}%` }} />
         </div>
       </div>
@@ -225,7 +228,7 @@ export const AccommodationFlow: React.FC<FlowProps> = ({
                 </div>
               </div>
 
-              <ContactFields name={clientName} setName={setClientName} phone={clientPhone} setPhone={setClientPhone} email={clientEmail} setEmail={setClientEmail} notes={clientNotes} setNotes={setClientNotes} />
+              <ContactFields name={clientName} setName={setClientName} phone={clientPhone} setPhone={setClientPhone} email={clientEmail} setEmail={setClientEmail} notes={clientNotes} setNotes={setClientNotes} consent={consentWhatsApp} setConsent={setConsentWhatsApp} />
 
               <div className="p-3 sm:p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
@@ -243,7 +246,7 @@ export const AccommodationFlow: React.FC<FlowProps> = ({
           <ArrowLeft className="w-4 h-4" />
           <span>{step === 1 ? 'Cancelar' : 'Anterior'}</span>
         </button>
-        <button onClick={step === 4 ? confirmBooking : handleNext} disabled={(step === 1 && (!checkIn || !checkOut || numNights === 0)) || (step === 4 && (!clientName || !clientPhone))} className="flex-1 px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 glow-up min-h-[44px]">
+        <button onClick={step === 4 ? confirmBooking : handleNext} disabled={(step === 1 && (!checkIn || !checkOut || numNights === 0)) || (step === 4 && (!clientName || !clientPhone || !consentWhatsApp))} className="flex-1 px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 glow-up min-h-[44px]">
           <span>{step === 4 ? 'Reservar Estadía' : 'Continuar'}</span>
           {step < 4 && <ArrowRight className="w-4 h-4" />}
         </button>

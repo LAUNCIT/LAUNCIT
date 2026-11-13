@@ -2,6 +2,8 @@ export type AppRole = 'client' | 'business';
 
 export type ClientSubView = 'explore' | 'my-booking' | 'faq' | 'profile' | 'favorites';
 
+export type UserRole = 'propietario' | 'administrador' | 'trabajador';
+
 export type BusinessSubView =
   | 'dashboard'
   | 'calendar'
@@ -12,7 +14,9 @@ export type BusinessSubView =
   | 'pricing'
   | 'whatsapp'
   | 'notifications'
-  | 'qr-code';
+  | 'qr-code'
+  | 'access-team'
+  | 'activity';
 
 export interface WhatsAppConfig {
   enabled: boolean;
@@ -71,7 +75,7 @@ export type DayName =
 
 export type SpecialistStatus = 'Disponible' | 'En Servicio' | 'Descanso';
 
-export type SaasPlanId = 'basico' | 'pro' | 'elite';
+export type SaasPlanId = 'basico' | 'gratis' | 'intermedio' | 'pro' | 'elite';
 
 export interface Venue {
   id: string;
@@ -112,6 +116,7 @@ export interface Professional {
   exp: string;
   status: SpecialistStatus;
   avatar: string;
+  linkedUid?: string;
 }
 
 export interface WorkingDayConfig {
@@ -141,6 +146,7 @@ export type BookingEngineType =
 export interface Appointment {
   id: string;
   code: string;
+  venueId: string;
   venueName: string;
   client: string;
   phone: string;
@@ -150,11 +156,12 @@ export interface Appointment {
   service: string;
   proId: string;
   pro: string;
+  profesionalUid?: string;
   dateKey: string; // Used for starting date or single date
   dayName: DayName;
   time: string;
   price: number;
-  status: 'Confirmada' | 'Completada' | 'Cancelada';
+  status: 'Confirmada' | 'Atendida' | 'Completada' | 'Cancelada';
   
   // Multicategory Specialized Fields
   engineType?: BookingEngineType;
@@ -189,6 +196,67 @@ export interface Appointment {
   isRecurring?: boolean;
   responsibleName?: string;
   responsiblePhone?: string;
+  consentWhatsApp?: boolean;
+  reminderSent?: boolean;
+}
+
+export interface BusinessMember {
+  uid: string;
+  negocioId: string;
+  negocioNombre: string;
+  nombre: string;
+  email: string;
+  rol: UserRole;
+  activo: boolean;
+  mustChangePassword: boolean;
+  profesionalId?: string | null;
+  profesionalNombre?: string | null;
+  createdAt?: string;
+  createdBy?: string;
+}
+
+export interface BusinessMembershipSummary {
+  negocioId: string;
+  negocioNombre: string;
+  rol: UserRole;
+  activo: boolean;
+}
+
+export interface BusinessDoc {
+  id: string;
+  name: string;
+  category: ServiceCategory;
+  categoryLabel: string;
+  subCategory?: string;
+  phone?: string;
+  address?: string;
+  location?: string;
+  description?: string;
+  image?: string;
+  logo?: string;
+  photos?: string[];
+  ownerUid: string;
+  plan: SaasPlanId;
+  limiteUsuarios: number;
+  activo: boolean;
+  whatsAppConfig?: WhatsAppConfig;
+  workingDays?: Record<DayName, WorkingDayConfig>;
+  createdAt?: string;
+}
+
+export type ActivityCategory = 'servicios' | 'citas' | 'equipo' | 'configuracion' | 'plan';
+
+export interface ActivityLogItem {
+  id: string;
+  negocioId: string;
+  actorUid: string;
+  actorNombre: string;
+  actorEmail: string;
+  actorRol: UserRole;
+  accion: string;
+  detalle: string;
+  categoria: ActivityCategory;
+  fecha: string;
 }
 
 export interface UpcomingDateOption {

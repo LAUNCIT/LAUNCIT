@@ -596,6 +596,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h1',
     code: 'GLW-4085',
+    venueId: 'v1',
     venueName: 'The Barber Club Flagship',
     client: 'David Restrepo',
     phone: '+57 311 234 5678',
@@ -613,6 +614,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h2',
     code: 'GLW-4086',
+    venueId: 'v1',
     venueName: 'Sérénité Spa & Masajes',
     client: 'Mariana Gómez',
     phone: '+57 314 345 6789',
@@ -630,6 +632,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h3',
     code: 'GLW-4087',
+    venueId: 'v1',
     venueName: 'Atelier de Belleza Capilar',
     client: 'Valeria Henao',
     phone: '+57 320 456 7890',
@@ -647,6 +650,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h4',
     code: 'GLW-4088',
+    venueId: 'v1',
     venueName: 'The Barber Club Flagship',
     client: 'Sebastián Jaramillo',
     phone: '+57 310 567 8901',
@@ -664,6 +668,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h5',
     code: 'GLW-4089',
+    venueId: 'v1',
     venueName: 'Sérénité Spa & Masajes',
     client: 'Catalina Duque',
     phone: '+57 318 678 9012',
@@ -681,6 +686,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_2',
     code: 'GLW-4092',
+    venueId: 'v1',
     venueName: 'Sérénité Spa & Masajes',
     client: 'Camila Ortiz',
     phone: '+57 315 889 0123',
@@ -698,6 +704,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h6',
     code: 'GLW-4090',
+    venueId: 'v1',
     venueName: 'The Barber Club Flagship',
     client: 'Felipe Morales',
     phone: '+57 316 789 0123',
@@ -715,6 +722,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h7',
     code: 'GLW-4094',
+    venueId: 'v1',
     venueName: 'The Barber Club Flagship',
     client: 'Alejandro Cárdenas',
     phone: '+57 317 890 1234',
@@ -732,6 +740,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h8',
     code: 'GLW-4095',
+    venueId: 'v1',
     venueName: 'DermaGlow Estética Facial',
     client: 'Daniela Cardona',
     phone: '+57 301 901 2345',
@@ -749,6 +758,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_1',
     code: 'GLW-4091',
+    venueId: 'v1',
     venueName: 'The Barber Club Flagship',
     client: 'Carlos Mendoza',
     phone: '+57 312 456 7890',
@@ -766,6 +776,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_3',
     code: 'GLW-4093',
+    venueId: 'v1',
     venueName: 'DermaGlow Estética Facial',
     client: 'Andrés Salgado',
     phone: '+57 300 712 4490',
@@ -783,6 +794,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h9',
     code: 'GLW-4096',
+    venueId: 'v1',
     venueName: 'Atelier de Belleza Capilar',
     client: 'Juliana Pineda',
     phone: '+57 319 012 3456',
@@ -800,6 +812,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt_h10',
     code: 'GLW-4097',
+    venueId: 'v1',
     venueName: 'Sérénité Spa & Masajes',
     client: 'Martín Vélez',
     phone: '+57 313 123 4567',

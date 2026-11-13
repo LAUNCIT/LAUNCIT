@@ -34,6 +34,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [consentWhatsApp, setConsentWhatsApp] = useState(false);
 
   // Custom fields
   const [hairLength, setHairLength] = useState('');
@@ -54,11 +55,12 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
   };
 
   const confirmBooking = () => {
-    if (!selectedService || !selectedPro || !selectedTime || !clientName || !clientPhone) return;
+    if (!selectedService || !selectedPro || !selectedTime || !clientName || !clientPhone || !consentWhatsApp) return;
     
     const apptData: Partial<Appointment> = {
       engineType: 'appointment',
       subCategory: venue.subCategory,
+      venueId: venue.id,
       serviceId: selectedService.id,
       service: selectedService.name,
       proId: selectedPro === 'any' ? 'any' : selectedPro.id,
@@ -70,6 +72,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
       client: clientName,
       phone: clientPhone,
       email: clientEmail,
+      consentWhatsApp: true,
       notes: `${venue.subCategory === 'Peluquería' ? `Largo: ${hairLength}, Tipo: ${hairType}` : dentalReason} | ${clientNotes}`,
     };
     onConfirm(apptData);
@@ -257,6 +260,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
                 phone={clientPhone} setPhone={setClientPhone}
                 email={clientEmail} setEmail={setClientEmail}
                 notes={clientNotes} setNotes={setClientNotes}
+                consent={consentWhatsApp} setConsent={setConsentWhatsApp}
               />
             </motion.div>
           )}
@@ -276,7 +280,7 @@ export const AppointmentFlow: React.FC<FlowProps> = ({
         <button
           onClick={step === 4 ? confirmBooking : handleNext}
           disabled={
-            (step === 1 && !selectedService) || (step === 2 && !selectedPro) || (step === 3 && !selectedTime) || (step === 4 && (!clientName || !clientPhone))
+            (step === 1 && !selectedService) || (step === 2 && !selectedPro) || (step === 3 && !selectedTime) || (step === 4 && (!clientName || !clientPhone || !consentWhatsApp))
           }
           className="flex-1 max-w-xs px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 disabled:opacity-40 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 min-h-[44px]"
         >

@@ -379,27 +379,72 @@
 
       // 1. Parse Business Name & Logo Image from URL Parameters
       const urlParams = new URLSearchParams(window.location.search);
-      const rawBizName = urlParams.get('negocio') || urlParams.get('venue') || urlParams.get('nombre') || urlParams.get('id');
+      const rawBizParam = urlParams.get('negocio') || urlParams.get('venue') || urlParams.get('nombre') || urlParams.get('id');
       const customLogoImg = urlParams.get('logo') || urlParams.get('image');
+      const rawDecoded = rawBizParam ? decodeURIComponent(rawBizParam).trim() : '';
 
-      const businessName = rawBizName ? decodeURIComponent(rawBizName).trim() : 'Negocio Asociado';
-      
-      // Update page title and business names
-      if (bizTitle) bizTitle.textContent = businessName;
-      if (welcomeBizName) welcomeBizName.textContent = businessName;
-      if (headerBadgeName) headerBadgeName.textContent = businessName;
-      document.title = `${businessName} — Reserva Directa | Launcit`;
+      let businessName = rawDecoded || 'Negocio Asociado';
+      let resolvedNegocioId = urlParams.get('id') || rawDecoded;
+      const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/launcit/databases/(default)/documents';
 
-      // Update business logo image or fallback to ./logo.png
-      const logoSrc = customLogoImg || './logo.png';
-      
-      if (welcomeLogo) {
-        welcomeLogo.src = logoSrc;
-        welcomeLogo.onerror = () => { welcomeLogo.src = './logo.png'; };
-      }
-      if (headerLogo) {
-        headerLogo.src = logoSrc;
-        headerLogo.onerror = () => { headerLogo.src = './logo.png'; };
+      const applyBusinessBranding = (name, logoUrl) => {
+        businessName = name;
+        if (bizTitle) bizTitle.textContent = name;
+        if (welcomeBizName) welcomeBizName.textContent = name;
+        if (headerBadgeName) headerBadgeName.textContent = name;
+        document.title = `${name} — Reserva Directa | Launcit`;
+
+        const finalLogo = logoUrl || customLogoImg || './logo.png';
+        if (welcomeLogo) {
+          welcomeLogo.src = finalLogo;
+          welcomeLogo.onerror = () => { welcomeLogo.src = './logo.png'; };
+        }
+        if (headerLogo) {
+          headerLogo.src = finalLogo;
+          headerLogo.onerror = () => { headerLogo.src = './logo.png'; };
+        }
+      };
+
+      applyBusinessBranding(businessName, customLogoImg);
+
+      // Load public business profile & services from Firestore (no auth, never reads citas)
+      if (resolvedNegocioId) {
+        fetch(`${FIRESTORE_BASE}/negocios/${encodeURIComponent(resolvedNegocioId)}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((docJson) => {
+            if (docJson && docJson.fields) {
+              const fsName = docJson.fields.name?.stringValue;
+              const fsLogo = docJson.fields.logo?.stringValue || docJson.fields.image?.stringValue;
+              if (fsName) {
+                applyBusinessBranding(fsName, fsLogo);
+              }
+            }
+          })
+          .catch(() => {});
+
+        fetch(`${FIRESTORE_BASE}/negocios/${encodeURIComponent(resolvedNegocioId)}/servicios`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((listJson) => {
+            if (listJson && Array.isArray(listJson.documents) && listJson.documents.length > 0) {
+              const serviceSelect = document.getElementById('select-service');
+              if (!serviceSelect) return;
+              const activeServices = listJson.documents
+                .map((d) => d.fields)
+                .filter((f) => f && f.name?.stringValue && f.isActive?.booleanValue !== false);
+              if (activeServices.length > 0) {
+                serviceSelect.innerHTML = '';
+                activeServices.forEach((f) => {
+                  const opt = document.createElement('option');
+                  const svcName = f.name.stringValue;
+                  const dur = f.duration?.stringValue || '';
+                  opt.value = svcName;
+                  opt.textContent = dur ? `${svcName} (${dur})` : svcName;
+                  serviceSelect.appendChild(opt);
+                });
+              }
+            }
+          })
+          .catch(() => {});
       }
 
       // 2. Simulated 3D Tilt Effect on mouse / touch / gyro for Welcome Card
@@ -482,7 +527,7 @@
       const btnWhatsappLink = document.getElementById('btn-whatsapp-link');
 
       if (btnConfirmBooking) {
-        btnConfirmBooking.addEventListener('click', () => {
+        btnConfirmBooking.addEventListener('click', async () => {
           const nameInput = document.getElementById('input-name');
           const phoneInput = document.getElementById('input-phone');
           const serviceSelect = document.getElementById('select-service');
@@ -501,14 +546,46 @@
             return;
           }
 
+          const bookingCode = `GLW-${Math.floor(1000 + Math.random() * 9000)}`;
+          const bookingId = `apt_${Date.now()}`;
+
+          // Create public booking in Firestore (write-only, never reads other bookings)
+          if (resolvedNegocioId) {
+            try {
+              await fetch(`${FIRESTORE_BASE}/negocios/${encodeURIComponent(resolvedNegocioId)}/citas?documentId=${encodeURIComponent(bookingId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fields: {
+                    id: { stringValue: bookingId },
+                    code: { stringValue: bookingCode },
+                    venueId: { stringValue: resolvedNegocioId },
+                    venueName: { stringValue: businessName },
+                    client: { stringValue: clientName },
+                    phone: { stringValue: clientPhone || '+57' },
+                    serviceId: { stringValue: 'public' },
+                    service: { stringValue: serviceName },
+                    proId: { stringValue: 'p1' },
+                    pro: { stringValue: 'Primer disponible' },
+                    dateKey: { stringValue: selectedDate },
+                    dayName: { stringValue: 'Lunes' },
+                    time: { stringValue: selectedTime },
+                    price: { integerValue: '0' },
+                    status: { stringValue: 'Confirmada' }
+                  }
+                })
+              });
+            } catch {}
+          }
+
           // Show confirmation card
           if (confirmationText) {
-            confirmationText.innerHTML = `<strong>${clientName}</strong>, tu cita para <strong>${serviceName}</strong> en <strong>${businessName}</strong> quedó agendada el <strong>${selectedDate}</strong> a las <strong>${selectedTime}</strong>.`;
+            confirmationText.innerHTML = `<strong>${clientName}</strong>, tu cita <strong>#${bookingCode}</strong> para <strong>${serviceName}</strong> en <strong>${businessName}</strong> quedó agendada el <strong>${selectedDate}</strong> a las <strong>${selectedTime}</strong>.`;
           }
 
           // Build WhatsApp confirmation message link
           if (btnWhatsappLink) {
-            const waMsg = `Hola ${businessName}, acabo de hacer una reserva con Launcit para ${serviceName} el día ${selectedDate} a las ${selectedTime}. Mi nombre es ${clientName}.`;
+            const waMsg = `Hola ${businessName}, acabo de hacer una reserva (#${bookingCode}) con Launcit para ${serviceName} el día ${selectedDate} a las ${selectedTime}. Mi nombre es ${clientName}.`;
             btnWhatsappLink.href = `https://wa.me/?text=${encodeURIComponent(waMsg)}`;
           }
 

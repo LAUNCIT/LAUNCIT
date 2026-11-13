@@ -136,6 +136,7 @@ export async function seedDatabaseIfEmpty() {
       {
         id: 'apt_1',
         code: 'GLW-4091',
+        venueId: 'v1',
         venueName: 'The Barber Club Flagship',
         client: 'Carlos Mendoza',
         phone: '+57 312 456 7890',
@@ -153,6 +154,7 @@ export async function seedDatabaseIfEmpty() {
       {
         id: 'apt_2',
         code: 'GLW-4092',
+        venueId: 'v2',
         venueName: 'Sérénité Spa & Masajes',
         client: 'Camila Ortiz',
         phone: '+57 315 889 0123',

@@ -34,6 +34,7 @@ export const FacilityFlow: React.FC<FlowProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [consentWhatsApp, setConsentWhatsApp] = useState(false);
 
   const activeServices = services.filter(s => s.isActive && s.category === venue.category);
   const selectedService = activeServices[0]; 
@@ -51,10 +52,11 @@ export const FacilityFlow: React.FC<FlowProps> = ({
   };
 
   const confirmBooking = () => {
-    if (!clientName || !clientPhone) return;
+    if (!clientName || !clientPhone || !consentWhatsApp) return;
     const apptData: Partial<Appointment> = {
       engineType: 'facility',
       subCategory: venue.subCategory,
+      venueId: venue.id,
       serviceId: selectedService?.id,
       service: selectedService?.name,
       dateKey: selectedDate,
@@ -67,6 +69,7 @@ export const FacilityFlow: React.FC<FlowProps> = ({
       client: clientName,
       phone: clientPhone,
       email: clientEmail,
+      consentWhatsApp: true,
       notes: `${venue.subCategory === 'Canchas' ? `Jugadores: ${numPlayers}` : ''} | ${clientNotes}`,
       responsibleName: clientName,
       responsiblePhone: clientPhone,
@@ -82,7 +85,7 @@ export const FacilityFlow: React.FC<FlowProps> = ({
           <span className="text-[10px] font-bold text-champagne-600 uppercase tracking-widest">Paso {step} de 4</span>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[150px]">{venue.name}</span>
         </div>
-        <div className="h-1 bg-sand-200 dark:bg-obsidian-800 rounded-full overflow-hidden">
+        <div className="h-1 bg-sand-200 dark:border-obsidian-800 rounded-full overflow-hidden">
           <motion.div className="h-full bg-champagne-500" initial={{ width: 0 }} animate={{ width: `${(step / 4) * 100}%` }} />
         </div>
       </div>
@@ -207,7 +210,7 @@ export const FacilityFlow: React.FC<FlowProps> = ({
                 </div>
               </div>
 
-              <ContactFields name={clientName} setName={setClientName} phone={clientPhone} setPhone={setClientPhone} email={clientEmail} setEmail={setClientEmail} notes={clientNotes} setNotes={setClientNotes} />
+              <ContactFields name={clientName} setName={setClientName} phone={clientPhone} setPhone={setClientPhone} email={clientEmail} setEmail={setClientEmail} notes={clientNotes} setNotes={setClientNotes} consent={consentWhatsApp} setConsent={setConsentWhatsApp} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -216,7 +219,7 @@ export const FacilityFlow: React.FC<FlowProps> = ({
       {/* Fixed Footer */}
       <div className="px-5 sm:px-6 py-3.5 border-t border-sand-200 dark:border-obsidian-800 bg-sand-50/95 dark:bg-obsidian-900/95 flex justify-between items-center gap-3 shrink-0 backdrop-blur-md pb-[max(1rem,env(safe-area-inset-bottom))] z-10">
         <button onClick={step === 1 ? onCancel : handleBack} className="px-4 py-3 rounded-2xl text-xs font-bold text-slate-500 hover:bg-sand-100 dark:hover:bg-obsidian-800 transition-all flex items-center gap-1.5 min-h-[44px]"><ArrowLeft className="w-4 h-4" /><span>{step === 1 ? 'Cancelar' : 'Anterior'}</span></button>
-        <button onClick={step === 4 ? confirmBooking : handleNext} disabled={(step === 1 && !selectedDate) || (step === 2 && !selectedTime) || (step === 4 && (!clientName || !clientPhone))} className="flex-1 max-w-xs px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all disabled:opacity-40 shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 min-h-[44px]"><span>{step === 4 ? 'Confirmar Alquiler' : 'Continuar'}</span>{step < 4 && <ArrowRight className="w-4 h-4" opacity-90 />}</button>
+        <button onClick={step === 4 ? confirmBooking : handleNext} disabled={(step === 1 && !selectedDate) || (step === 2 && !selectedTime) || (step === 4 && (!clientName || !clientPhone || !consentWhatsApp))} className="flex-1 max-w-xs px-5 py-3.5 rounded-2xl bg-champagne-500 hover:bg-champagne-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all disabled:opacity-40 shadow-lg shadow-champagne-500/20 flex items-center justify-center gap-2 min-h-[44px]"><span>{step === 4 ? 'Confirmar Alquiler' : 'Continuar'}</span>{step < 4 && <ArrowRight className="w-4 h-4" opacity-90 />}</button>
       </div>
     </div>
   );
