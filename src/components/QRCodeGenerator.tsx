@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Download, Copy, ExternalLink, Check, Eye, Sparkles, Camera } from 'lucide-react';
 import { Venue } from '../types';
+import { buildScannerTestUrl, buildVenueBookingUrl } from '../utils/urlUtils';
 
 export interface QRCodeGeneratorProps {
   venue: Venue;
@@ -21,21 +22,9 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   const [copied, setCopied] = useState(false);
   const qrSvgId = `qr-svg-${venue.id}`;
 
-  // Automatically generate the unique URL for ver.html respecting repository subpaths (e.g. GitHub Pages /LAUNCIT/)
-  const getFullArUrl = () => {
-    let base = `./ver.html?negocio=${encodeURIComponent(venue.name)}`;
-    if (venue.logo) {
-      base += `&logo=${encodeURIComponent(venue.logo)}`;
-    }
-    if (typeof window === 'undefined') return base;
-    const pathname = window.location.pathname.replace(/\/index\.html$/i, '').replace(/\/$/, '');
-    let url = `${window.location.origin}${pathname}/ver.html?negocio=${encodeURIComponent(venue.name)}`;
-    if (venue.logo) {
-      url += `&logo=${encodeURIComponent(venue.logo)}`;
-    }
-    return url;
-  };
-  const arUrl = getFullArUrl();
+  // Dynamically build booking URL using current origin and base path (e.g. /LAUNCIT/ on GitHub Pages)
+  const arUrl = buildVenueBookingUrl(venue);
+  const scannerUrl = buildScannerTestUrl(venue);
 
   // Download QR Code as High-Resolution PNG (1000x1000px)
   const handleDownloadPNG = () => {
@@ -247,7 +236,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           </a>
 
           <a
-            href={`./escanear.html?negocio=${encodeURIComponent(venue.name)}`}
+            href={scannerUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="px-3 py-1.5 rounded-xl border border-champagne-500/40 bg-champagne-500/10 text-champagne-400 hover:bg-champagne-500/20 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-champagne-500/10"

@@ -238,6 +238,8 @@ export interface BusinessDoc {
   ownerUid: string;
   plan: SaasPlanId;
   limiteUsuarios: number;
+  limiteReservas?: number | null;
+  planUpdatedAt?: string;
   activo: boolean;
   whatsAppConfig?: WhatsAppConfig;
   workingDays?: Record<DayName, WorkingDayConfig>;

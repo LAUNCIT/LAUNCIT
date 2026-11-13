@@ -75,7 +75,10 @@ import {
   canAccessView,
   getDefaultViewForRole,
   getPlanDisplayName,
+  getPlanReservationLimit,
   getPlanUserLimit,
+  getSaasPlanConfig,
+  normalizePlanId,
   ROLE_LABELS,
 } from './utils/permissions';
 import { useAuth } from './context/AuthContext';
@@ -193,7 +196,7 @@ export default function App() {
   const [appointments, setAppointments] = useState<Appointment[]>(() =>
     loadFromStorage(OFFLINE_STORAGE_KEYS.APPOINTMENTS, INITIAL_APPOINTMENTS)
   );
-  const [activePlan, setActivePlan] = useState<SaasPlanId>('pro');
+  const [activePlan, setActivePlan] = useState<SaasPlanId>('gratis');
   const [whatsAppConfig, setWhatsAppConfig] = useState<WhatsAppConfig>(() =>
     loadFromStorage(OFFLINE_STORAGE_KEYS.WHATSAPP_CONFIG, DEFAULT_WHATSAPP_CONFIG)
   );
@@ -609,7 +612,7 @@ export default function App() {
     const loadFirestoreBusinessData = async () => {
       try {
         if (activeBusiness.plan) {
-          setActivePlan(activeBusiness.plan);
+          setActivePlan(normalizePlanId(activeBusiness.plan));
         }
         if (activeBusiness.whatsAppConfig) {
           setWhatsAppConfig(activeBusiness.whatsAppConfig);
@@ -937,7 +940,22 @@ export default function App() {
     setIsBookingModalOpen(true);
   };
 
-  const handleConfirmBooking = (newAppt: Appointment) => {
+  const handleConfirmBooking = (newAppt: Appointment): boolean => {
+    if (activeBusiness && newAppt.venueId === activeBusiness.id) {
+      const resLimit = getPlanReservationLimit(activePlan);
+      if (resLimit !== null) {
+        const activeBizCount = appointments.filter(
+          (a) => a.venueId === activeBusiness.id && a.status !== 'Cancelada'
+        ).length;
+        if (activeBizCount >= resLimit) {
+          showToast(
+            `Límite de ${resLimit} reservas alcanzado en el Plan Gratis. Cambia a Plan Intermedio o Pro para reservas ilimitadas.`
+          );
+          return false;
+        }
+      }
+    }
+
     const matchedPro = professionals.find((p) => p.id === newAppt.proId);
     const enrichedAppt: Appointment = {
       ...newAppt,
@@ -964,6 +982,7 @@ export default function App() {
       enrichedAppt,
       `Cita ${enrichedAppt.code} (${enrichedAppt.client})`
     );
+    return true;
   };
 
   const handleCancelAppointment = (id: string) => {
@@ -1319,25 +1338,45 @@ export default function App() {
       showToast('Solo el propietario puede cambiar el plan.');
       return;
     }
-    setActivePlan(planId);
-    const limit = getPlanUserLimit(planId);
-    if (activeBusiness) {
-      try {
-        await updateDoc(doc(db, 'negocios', activeBusiness.id), {
-          plan: planId,
-          limiteUsuarios: limit,
-        });
-        refreshActiveBusinessDoc({ plan: planId, limiteUsuarios: limit });
-        await logActivity({
-          accion: 'Cambio de plan SaaS',
-          detalle: `Plan actualizado a ${getPlanDisplayName(planId)}.`,
-          categoria: 'plan',
-        });
-      } catch (err) {
-        console.warn('Error guardando plan en Firestore:', err);
-      }
+
+    const normalizedId = normalizePlanId(planId);
+    const planConfig = getSaasPlanConfig(normalizedId);
+
+    if (!activeBusiness) {
+      showToast('No se encontró un negocio activo para actualizar el plan en Firestore.');
+      return;
     }
-    showToast(`Suscripción actualizada al ${getPlanDisplayName(planId)}.`);
+
+    const planPayload = {
+      plan: normalizedId,
+      limiteUsuarios: planConfig.userLimit,
+      limiteReservas: planConfig.reservationLimit,
+      planUpdatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await updateDoc(doc(db, 'negocios', activeBusiness.id), planPayload);
+      setActivePlan(normalizedId);
+      refreshActiveBusinessDoc(planPayload);
+      await logActivity({
+        accion: 'Cambio de plan SaaS',
+        detalle: `Plan actualizado a ${planConfig.name} (${planConfig.userLimit} usuario(s), ${
+          planConfig.reservationLimit === null
+            ? 'reservas ilimitadas'
+            : `hasta ${planConfig.reservationLimit} reservas`
+        }).`,
+        categoria: 'plan',
+      });
+      showToast(`Suscripción actualizada al ${planConfig.name}.`);
+    } catch (err: any) {
+      console.error('Error guardando plan en Firestore:', err);
+      showToast(
+        err?.code === 'permission-denied'
+          ? 'No tienes permisos en Firestore para cambiar el plan de este negocio.'
+          : 'No se pudo actualizar el plan en Firestore. Intenta de nuevo.'
+      );
+      throw err;
+    }
   };
 
   const handleUpdateVenue = (updatedVenue: Venue) => {

@@ -1,5 +1,6 @@
 import { Appointment } from '../types';
 import { formatCOP } from './scheduleUtils';
+import { buildAppointmentTicketUrl } from './urlUtils';
 
 export interface WhatsAppVariable {
   tag: string;
@@ -181,9 +182,8 @@ export function compileWhatsAppMessage(
   const cleanPhone = cleanPhoneNumber(phoneStr);
   const venueId = appt?.venueId || customFallbacks?.venueId || 'default';
   
-  // Real URL construction
-  const pathname = typeof window !== 'undefined' ? window.location.pathname.replace(/\/index\.html$/i, '').replace(/\/$/, '') : '';
-  const confirmationUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${pathname}/ver.html?negocio=${encodeURIComponent(venueId)}&codigo=${encodeURIComponent(codeStr)}`;
+  // Real URL construction respecting current domain & base path (e.g. /LAUNCIT/)
+  const confirmationUrl = buildAppointmentTicketUrl(venueId, codeStr);
 
   const map: Record<string, string> = {
     cliente_nombre: clientName,

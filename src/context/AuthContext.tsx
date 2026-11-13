@@ -426,8 +426,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=800&q=80',
         ],
         ownerUid: user.uid,
-        plan: 'basico',
+        plan: 'gratis',
         limiteUsuarios: 1,
+        limiteReservas: 40,
         activo: true,
         whatsAppConfig: {
           ...DEFAULT_WHATSAPP_CONFIG,
@@ -469,7 +470,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       await logActivity({
         accion: 'Negocio creado',
-        detalle: `Se registró el negocio "${cleanName}" con plan Gratis (1 usuario).`,
+        detalle: `Se registró el negocio "${cleanName}" con Plan Gratis (1 usuario, hasta 40 reservas).`,
         categoria: 'configuracion',
         negocioIdOverride: negocioId,
         memberOverride: ownerMember,

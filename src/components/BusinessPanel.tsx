@@ -63,7 +63,13 @@ import {
   WhatsAppConfig,
   WorkingDayConfig,
 } from '../types';
-import { canAccessView } from '../utils/permissions';
+import {
+  canAccessView,
+  getPlanShortName,
+  getSaasPlanConfig,
+  normalizePlanId,
+  SAAS_PLANS,
+} from '../utils/permissions';
 import {
   ALL_DAY_HOURS,
   BRAND_LOGO_FALLBACK,
@@ -92,6 +98,7 @@ import {
 } from '../config/arConfig';
 import { ResilientImage } from './ResilientImage';
 import { DailyRevenueTrendChart } from './DailyRevenueTrendChart';
+import { buildScannerTestUrl, buildVenueBookingUrl } from '../utils/urlUtils';
 
 interface BusinessPanelProps {
   activeView: BusinessSubView;
@@ -128,7 +135,7 @@ interface BusinessPanelProps {
     status: Appointment['status']
   ) => void;
   onUpdateAppointment?: (id: string, updates: Partial<Appointment>) => void;
-  onSelectPlan: (planId: SaasPlanId) => void;
+  onSelectPlan: (planId: SaasPlanId) => Promise<void> | void;
   onTestQrSplash?: (venue: Venue) => void;
   onShowToast: (msg: string) => void;
   userRole?: UserRole | null;
@@ -296,6 +303,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
 
   // SaaS Billing Cadence & Notifications State
   const [annualBilling, setAnnualBilling] = useState(false);
+  const [updatingPlanId, setUpdatingPlanId] = useState<SaasPlanId | null>(null);
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(true);
   const [notifySms24h, setNotifySms24h] = useState(true);
   const [notifySms2h, setNotifySms2h] = useState(true);
@@ -497,6 +505,16 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
     () => visibleAppointments.filter((a) => a.status !== 'Cancelada'),
     [visibleAppointments]
   );
+
+  const currentPlanConfig = useMemo(
+    () => getSaasPlanConfig(activePlan),
+    [activePlan]
+  );
+
+  const businessActiveAppointmentsCount = useMemo(() => {
+    if (!currentVenue) return activeAppointments.length;
+    return activeAppointments.filter((a) => a.venueId === currentVenue.id).length;
+  }, [activeAppointments, currentVenue]);
 
   // Confirmed monthly revenue metrics (accumulated from confirmed appointments)
   const confirmedAppointments = useMemo(
@@ -820,9 +838,9 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                 Resumen Operativo del Negocio
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Sesión de socio: <span className="font-mono">{partnerEmail}</span> · Plan{' '}
+                Sesión de socio: <span className="font-mono">{partnerEmail}</span> ·{' '}
                 <span className="uppercase font-semibold text-champagne-600 dark:text-champagne-400">
-                  {activePlan}
+                  {getPlanShortName(activePlan)}
                 </span>
               </p>
             </div>
@@ -853,10 +871,15 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                 Reservas Activas
               </p>
               <p className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
-                {activeAppointments.length}
+                {businessActiveAppointmentsCount}
+                {currentPlanConfig.reservationLimit !== null
+                  ? ` / ${currentPlanConfig.reservationLimit}`
+                  : ''}
               </p>
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                Sincronizadas desde portal cliente
+                {currentPlanConfig.reservationLimit !== null
+                  ? `Límite de ${currentPlanConfig.reservationLimit} reservas (${currentPlanConfig.name})`
+                  : 'Reservas ilimitadas en tu plan'}
               </p>
             </div>
 
@@ -2906,48 +2929,41 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
             </div>
           </div>
 
+          {/* Live Plan Usage Summary */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-obsidian-900 border border-sand-200 dark:border-obsidian-800 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="space-y-0.5">
+              <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                Plan Actual en Firestore
+              </span>
+              <p className="text-sm font-extrabold text-champagne-600 dark:text-champagne-400">
+                {currentPlanConfig.name}
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                Usuarios en Equipo de acceso
+              </span>
+              <p className="text-sm font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
+                {teamMembers.length} / {currentPlanConfig.userLimit}{' '}
+                {currentPlanConfig.userLimit === 1 ? 'usuario' : 'usuarios'}
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                Límite de Reservas
+              </span>
+              <p className="text-sm font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
+                {currentPlanConfig.reservationLimit !== null
+                  ? `${businessActiveAppointmentsCount} / ${currentPlanConfig.reservationLimit} reservas`
+                  : `${businessActiveAppointmentsCount} · Ilimitadas`}
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                id: 'basico' as SaasPlanId,
-                name: 'Plan Gratis',
-                audience: 'Para profesionales independientes',
-                monthlyPrice: 0,
-                features: [
-                  '1 usuario en Equipo de acceso',
-                  'Hasta 40 reservas mensuales',
-                  'Reserva cliente sin registro en 4 pasos',
-                ],
-              },
-              {
-                id: 'intermedio' as SaasPlanId,
-                name: 'Plan Intermedio',
-                audience: 'Para barberías, spas y salones en crecimiento',
-                monthlyPrice: 49000,
-                features: [
-                  'Hasta 3 usuarios en Equipo de acceso',
-                  'Reservas y clientes ilimitados',
-                  'Calendario inteligente con bloqueos horarios',
-                  'Plantillas de confirmación por WhatsApp',
-                  'Burbuja con logo animado al escanear con LAUNCIT',
-                ],
-              },
-              {
-                id: 'pro' as SaasPlanId,
-                name: 'Plan Pro',
-                audience: 'Para clínicas estéticas y múltiples sedes',
-                monthlyPrice: 99000,
-                features: [
-                  'Hasta 5 usuarios en Equipo de acceso',
-                  'Registro de actividad y control de roles',
-                  'Recordatorios WhatsApp + soporte prioritario',
-                ],
-              },
-            ].map((plan) => {
-              const isCurrent =
-                activePlan === plan.id ||
-                (plan.id === 'basico' && activePlan === 'gratis') ||
-                (plan.id === 'pro' && activePlan === 'elite');
+            {SAAS_PLANS.map((plan) => {
+              const isCurrent = normalizePlanId(activePlan) === plan.id;
+              const isSavingThis = updatingPlanId === plan.id;
               const finalPrice = annualBilling
                 ? Math.round(plan.monthlyPrice * 0.8)
                 : plan.monthlyPrice;
@@ -2986,6 +3002,24 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                       </span>
                     </div>
 
+                    <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                      <span className="px-2.5 py-1 rounded-lg bg-sand-100 dark:bg-obsidian-850 text-slate-700 dark:text-slate-200 border border-sand-200 dark:border-obsidian-750">
+                        {plan.userLimit === 1
+                          ? '1 usuario'
+                          : `Hasta ${plan.userLimit} usuarios`}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-sand-100 dark:bg-obsidian-850 text-slate-700 dark:text-slate-200 border border-sand-200 dark:border-obsidian-750">
+                        {plan.reservationLimit !== null
+                          ? `Hasta ${plan.reservationLimit} reservas`
+                          : 'Reservas ilimitadas'}
+                      </span>
+                      {plan.roleControl && (
+                        <span className="px-2.5 py-1 rounded-lg bg-champagne-500/15 text-champagne-700 dark:text-champagne-300 border border-champagne-500/30">
+                          Control de roles y soporte prioritario
+                        </span>
+                      )}
+                    </div>
+
                     <ul className="space-y-2.5 pt-2 text-xs text-slate-700 dark:text-slate-300">
                       {plan.features.map((feat) => (
                         <li key={feat} className="flex items-start gap-2">
@@ -2998,15 +3032,28 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
 
                   <button
                     type="button"
-                    disabled={isCurrent}
-                    onClick={() => onSelectPlan(plan.id)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-extrabold transition-colors ${
+                    disabled={isCurrent || updatingPlanId !== null}
+                    onClick={async () => {
+                      setUpdatingPlanId(plan.id);
+                      try {
+                        await onSelectPlan(plan.id);
+                      } catch {
+                        // Error toast handled by parent
+                      } finally {
+                        setUpdatingPlanId(null);
+                      }
+                    }}
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-extrabold transition-colors disabled:opacity-60 ${
                       isCurrent
-                        ? 'bg-champagne-500 text-slate-950 cursor-default'
+                        ? 'bg-champagne-500 text-slate-950 cursor-default disabled:opacity-100'
                         : 'border border-sand-300 dark:border-obsidian-700 text-slate-800 dark:text-white hover:bg-champagne-500 hover:text-slate-950 hover:border-champagne-500'
                     }`}
                   >
-                    {isCurrent ? 'Suscripción Activa' : `Cambiar a ${plan.name}`}
+                    {isCurrent
+                      ? 'Suscripción Activa'
+                      : isSavingThis
+                        ? 'Actualizando plan...'
+                        : `Cambiar a ${plan.name}`}
                   </button>
                 </div>
               );
@@ -3910,17 +3957,16 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              const pathname = window.location.pathname.replace(/\/index\.html$/i, '').replace(/\/$/, '');
-                              const url = `${window.location.origin}${pathname}/ver.html?negocio=${encodeURIComponent(v.name)}`;
+                              const url = buildVenueBookingUrl(v);
                               if (navigator.clipboard) {
                                 navigator.clipboard.writeText(url);
-                                onShowToast(`Enlace WebAR copiado para ${v.name}`);
+                                onShowToast(`Enlace de reserva copiado para ${v.name}`);
                               }
                             }}
                             className="font-mono text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 group"
-                            title="Haz clic para copiar enlace WebAR"
+                            title="Haz clic para copiar enlace único de reserva"
                           >
-                            <span className="truncate max-w-[130px]">/ver.html?negocio={encodeURIComponent(v.name)}</span>
+                            <span className="truncate max-w-[180px]">{buildVenueBookingUrl(v)}</span>
                             <Copy className="w-3 h-3 opacity-60 group-hover:opacity-100 shrink-0" />
                           </button>
                         </td>
@@ -3936,7 +3982,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                             Ver QR
                           </button>
                           <a
-                            href={`./ver.html?negocio=${encodeURIComponent(v.name)}`}
+                            href={buildVenueBookingUrl(v)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-2 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-bold text-[10px] uppercase transition-colors inline-flex items-center gap-1"
@@ -3946,7 +3992,7 @@ export const BusinessPanel: React.FC<BusinessPanelProps> = ({
                             <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                           <a
-                            href={`./escanear.html?negocio=${encodeURIComponent(v.name)}`}
+                            href={buildScannerTestUrl(v)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-2 py-1 rounded-lg bg-champagne-500/20 hover:bg-champagne-500/30 text-champagne-400 font-bold text-[10px] uppercase transition-colors inline-flex items-center gap-1"

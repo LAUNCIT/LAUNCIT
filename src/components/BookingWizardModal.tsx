@@ -25,7 +25,7 @@ interface BookingWizardModalProps {
   appointments: Appointment[];
   whatsAppConfig?: WhatsAppConfig;
   onClose: () => void;
-  onConfirmBooking: (appointment: Appointment) => void;
+  onConfirmBooking: (appointment: Appointment) => boolean | void;
   onGoToMyBookings: (phone: string) => void;
   onShowToast: (msg: string) => void;
 }
@@ -58,7 +58,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       ...apptData
     } as Appointment;
 
-    onConfirmBooking(fullAppt);
+    const accepted = onConfirmBooking(fullAppt);
+    if (accepted === false) return;
     setConfirmedAppt(fullAppt);
   };
 

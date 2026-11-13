@@ -170,7 +170,7 @@ export const AccessTeamSection: React.FC<AccessTeamSectionProps> = ({
         <div className="flex items-center gap-2.5">
           <ShieldCheck className="w-4 h-4 text-champagne-500 shrink-0" />
           <span className="text-slate-700 dark:text-slate-300">
-            Plan actual: <strong className="text-champagne-600 dark:text-champagne-400">{getPlanDisplayName(activePlan)}</strong> · Límite por plan: Gratis 1, Intermedio 3, Pro 5.
+            Plan actual: <strong className="text-champagne-600 dark:text-champagne-400">{getPlanDisplayName(activePlan)}</strong> · Límites: Gratis 1 usuario (40 reservas), Intermedio 3 usuarios (ilimitadas), Pro 5 usuarios (control de roles y soporte prioritario).
           </span>
         </div>
         {!limitReached && (
